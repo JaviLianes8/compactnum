@@ -10,6 +10,13 @@ def test_formats_each_scale() -> None:
     assert format(1_500_000_000_000) == "1.5T"
 
 
+def test_reaches_the_largest_short_scale_names() -> None:
+    assert format(2_500_000_000_000_000) == "2.5Qa"
+    assert format(3_000_000_000_000_000_000) == "3Qi"
+    assert format(4_000_000_000_000_000_000_000) == "4Sx"
+    assert format(5_000_000_000_000_000_000_000_000) == "5Sp"
+
+
 def test_small_numbers_keep_their_value() -> None:
     assert format(0) == "0"
     assert format(42) == "42"
@@ -48,9 +55,36 @@ def test_long_style_uses_words_with_a_space() -> None:
     assert format(500, style="long") == "500"
 
 
+def test_short_style_is_an_alias_of_si() -> None:
+    assert format(2_000_000_000, style="short") == format(2_000_000_000, style="si")
+
+
+def test_metric_style_uses_true_si_prefixes() -> None:
+    assert format(1_500_000_000, style="metric") == "1.5G"
+    assert format(1_500_000_000_000_000, style="metric") == "1.5P"
+    assert format(2_000_000_000, style="si") == "2B"
+
+
+def test_binary_base_uses_iec_prefixes() -> None:
+    assert format(1536, base=1024) == "1.5Ki"
+    assert format(5_368_709_120, base=1024) == "5Gi"
+    assert format(1024, base=1024, style="long") == "1 kibi"
+
+
+def test_unit_is_glued_to_the_suffix() -> None:
+    assert format(1536, base=1024, unit="B") == "1.5KiB"
+    assert format(2000, unit="B") == "2kB"
+    assert format(900, unit="B") == "900B"
+
+
 def test_trim_zeros_can_be_disabled() -> None:
     assert format(2000, trim_zeros=False) == "2.0k"
     assert format(500, precision=2, trim_zeros=False) == "500.00"
+
+
+def test_decimal_separator_can_be_a_comma() -> None:
+    assert format(1500, decimal_sep=",") == "1,5k"
+    assert format(42, decimal_sep=",") == "42"
 
 
 def test_rejects_negative_precision() -> None:
@@ -61,3 +95,15 @@ def test_rejects_negative_precision() -> None:
 def test_rejects_unknown_style() -> None:
     with pytest.raises(ValueError):
         format(1000, style="fancy")
+
+
+def test_rejects_unknown_base() -> None:
+    with pytest.raises(ValueError):
+        format(1000, base=2)
+
+
+def test_rejects_bad_decimal_separator() -> None:
+    with pytest.raises(ValueError):
+        format(1000, decimal_sep=",,")
+    with pytest.raises(ValueError):
+        format(1000, decimal_sep="k")
