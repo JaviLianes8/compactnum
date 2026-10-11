@@ -79,6 +79,18 @@ def test_installed_script_reports_version(console_script: Path) -> None:
     assert result.stdout.strip() == f"compactnum {_expected_version()}"
 
 
+def test_module_entry_point_runs(console_script: Path) -> None:
+    python = console_script.parent / ("python.exe" if os.name == "nt" else "python")
+    result = subprocess.run(
+        [str(python), "-m", "compactnum", "format", "1200"],
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 0
+    assert result.stdout.strip() == "1.2k"
+
+
 def _expected_version() -> str:
     text = (PROJECT_ROOT / "src" / "compactnum" / "__init__.py").read_text(encoding="utf-8")
     for line in text.splitlines():
