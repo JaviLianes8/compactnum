@@ -4,14 +4,14 @@ build-backend = "hatchling.build"
 
 [project]
 name = "compactnum"
-version = "0.1.0"
+version = "0.2.0"
 description = "Two-way compact number notation: format large numbers as 1.2k or 3.5M and parse them back"
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
 license-files = ["LICENSE"]
 authors = [{ name = "Javier Lianes", email = "javier@lianes8studio.com" }]
-keywords = ["number", "format", "parse", "humanize", "abbreviate", "compact"]
+keywords = ["number", "format", "parse", "humanize", "abbreviate", "compact", "iec", "si"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
@@ -22,6 +22,9 @@ dependencies = []
 
 [project.optional-dependencies]
 dev = ["ruff", "mypy", "pytest", "build", "twine"]
+
+[project.scripts]
+compactnum = "compactnum._cli:main"
 
 [project.urls]
 Homepage = "https://lianes8studio.com"
