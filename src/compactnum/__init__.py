@@ -1,7 +1,10 @@
-"""Two-way compact number notation: format large numbers as 1.2k or 3.5M and parse them back"""
+"""Two-way compact number notation: format numbers and parse them back."""
 
 from __future__ import annotations
 
+from ._format import format
+from ._parse import CompactError, parse
+
 __version__ = "0.1.0"
 
-__all__: list[str] = []
+__all__ = ["CompactError", "format", "parse"]
