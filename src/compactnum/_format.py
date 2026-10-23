@@ -2,13 +2,34 @@
 
 from __future__ import annotations
 
-from decimal import ROUND_HALF_UP, Decimal
+import numbers
+from decimal import (
+    MAX_EMAX,
+    MIN_EMIN,
+    ROUND_HALF_UP,
+    Context,
+    Decimal,
+    DivisionByZero,
+    Inexact,
+    InvalidOperation,
+    Overflow,
+)
 
-from ._scales import format_entries, validate_base, validate_separator, validate_style
+from ._scales import (
+    MAX_DIGITS,
+    check_integer,
+    check_text,
+    format_entries,
+    validate_base,
+    validate_separator,
+    validate_style,
+)
+
+_INT_LIMIT = 10**MAX_DIGITS
 
 
 def format(
-    value: float,
+    value: float | Decimal,
     *,
     precision: int = 1,
     style: str = "si",
@@ -20,27 +41,35 @@ def format(
     """Format ``value`` as compact notation.
 
     Args:
-        value: The number to render. Accepts ``int`` or ``float``.
-        precision: Decimals kept in the mantissa. Must be ``>= 0``.
+        value: The number to render: an ``int``, a ``float``, a
+            :class:`~decimal.Decimal`, or any other real number, which is read
+            through ``float()``. A float is read as its shortest ``repr``, so
+            ``1.05`` rounds like the decimal ``1.05``. It must be finite and
+            have at most 4300 integer digits.
+        precision: Decimals kept in the mantissa, from ``0`` to ``4300``.
         style: ``"si"`` or its alias ``"short"`` for short-scale letters
-            (``k M B T``), ``"metric"`` for true SI prefixes (``k M G T``), or
-            ``"long"`` for words (``thousand``, ``million``).
+            (``k M B T Qa Qi Sx Sp Oc No``), ``"metric"`` for SI prefixes
+            (``k M G T P E Z Y R Q``), or ``"long"`` for words (``thousand``
+            to ``nonillion``).
         base: ``1000`` for decimal magnitudes or ``1024`` for binary (IEC)
-            magnitudes (``Ki Mi Gi`` and the ``kibi`` words under ``"long"``).
-        unit: Optional trailing unit glued to the suffix, for example ``"B"``
-            to produce ``"1.5KiB"``.
+            magnitudes (``Ki`` to ``Yi``, and ``kibi`` to ``yobi`` under ``"long"``).
+        unit: Text appended exactly as given after the suffix, for example
+            ``"B"`` to produce ``"1.5KiB"``.
         trim_zeros: Drop trailing fractional zeros when true.
         decimal_sep: Single character used as the decimal point in the output.
 
     Returns:
-        The compact string. Rounding is half-up and carries across scales, so
-        ``999_999`` becomes ``"1M"``. The result is lossy by design; use
-        :func:`compactnum.parse` to read a value back approximately or
-        :func:`compactnum.parse_decimal` for the exact rendered quantity.
+        The compact string. Rounding is half-up (ties away from zero) and
+        carries across scales, so ``999_999`` becomes ``"1M"``. A value that
+        rounds to zero has no minus sign. The result is lossy by design;
+        :func:`compactnum.parse_decimal` reads back exactly the quantity shown.
+        Values past the largest suffix keep that suffix with a bigger mantissa.
 
     Raises:
-        ValueError: If ``precision`` is negative, or ``style``, ``base`` or
-            ``decimal_sep`` is invalid.
+        TypeError: If ``value`` is not a real number (``bool`` included), an
+            integer argument is not an integer, or a text argument is not a ``str``.
+        ValueError: If ``value`` is not finite or too large, ``precision`` is
+            out of range, or ``style``, ``base`` or ``decimal_sep`` is invalid.
 
     Examples:
         >>> format(1200)
@@ -49,32 +78,71 @@ def format(
         '1.5KiB'
         >>> format(2_000_000, style="long")
         '2 million'
+        >>> format(-999_999, style="metric")
+        '-1M'
     """
-    if precision < 0:
-        raise ValueError("precision must be non-negative")
-    validate_style(style)
-    validate_base(base)
-    validate_separator(decimal_sep)
+    number = _coerce(value)
+    digits = check_integer("precision", precision)
+    if not 0 <= digits <= MAX_DIGITS:
+        raise ValueError(f"precision must be between 0 and {MAX_DIGITS}")
+    style = validate_style(style)
+    base = validate_base(base)
+    check_text("unit", unit)
+    decimal_sep = validate_separator(decimal_sep)
 
-    number = Decimal(str(value))
-    magnitude = abs(number)
-    quantum = Decimal(1).scaleb(-precision)
+    magnitude = number.copy_abs()
+    size = len(magnitude.as_tuple().digits) + max(magnitude.adjusted(), 0) + digits + 100
+    exact = Context(
+        prec=size,
+        rounding=ROUND_HALF_UP,
+        Emax=MAX_EMAX,
+        Emin=MIN_EMIN,
+        traps=[InvalidOperation, DivisionByZero, Overflow, Inexact],
+    )
+    rounding = exact.copy()
+    rounding.traps[Inexact] = False
+    quantum = Decimal((0, (1,), -digits))
     entries = format_entries(base, style)
 
+    def scaled(factor: Decimal) -> Decimal:
+        return exact.divide(magnitude, factor).quantize(quantum, context=rounding)
+
     factor, suffix = _choose(magnitude, entries)
-    mantissa = _scaled(magnitude, factor, quantum)
+    mantissa = scaled(factor)
     # Rounding can push the mantissa onto the next scale (999.95k becomes 1M).
     while mantissa >= base:
         nxt = _next(factor, entries)
         if nxt is None:
             break
         factor, suffix = nxt
-        mantissa = _scaled(magnitude, factor, quantum)
+        mantissa = scaled(factor)
 
     sign = "-" if number < 0 and mantissa != 0 else ""
     gap = " " if style == "long" and suffix else ""
-    body = _render(mantissa, trim_zeros, decimal_sep)
+    body = _render(mantissa, bool(trim_zeros), decimal_sep)
     return f"{sign}{body}{gap}{suffix}{unit}"
+
+
+def _coerce(value: object) -> Decimal:
+    if isinstance(value, Decimal):
+        number = value
+    elif isinstance(value, bool) or not isinstance(value, numbers.Real):
+        raise TypeError(f"value must be a real number, not {type(value).__name__}")
+    elif isinstance(value, numbers.Integral):
+        integer = int(value)
+        if not -_INT_LIMIT < integer < _INT_LIMIT:
+            raise ValueError(f"value has more than {MAX_DIGITS} integer digits")
+        number = Decimal(integer)
+    else:
+        try:
+            number = Decimal(repr(float(value)))
+        except OverflowError:
+            raise ValueError("value is too large for a float") from None
+    if not number.is_finite():
+        raise ValueError("value must be finite")
+    if number and number.adjusted() >= MAX_DIGITS:
+        raise ValueError(f"value has more than {MAX_DIGITS} integer digits")
+    return number
 
 
 def _choose(magnitude: Decimal, entries: tuple[tuple[Decimal, str], ...]) -> tuple[Decimal, str]:
@@ -90,10 +158,6 @@ def _next(factor: Decimal, entries: tuple[tuple[Decimal, str], ...]) -> tuple[De
         if scale_factor > factor:
             return scale_factor, scale_suffix
     return None
-
-
-def _scaled(magnitude: Decimal, factor: Decimal, quantum: Decimal) -> Decimal:
-    return (magnitude / factor).quantize(quantum, rounding=ROUND_HALF_UP)
 
 
 def _render(mantissa: Decimal, trim_zeros: bool, decimal_sep: str) -> str:

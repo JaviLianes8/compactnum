@@ -85,7 +85,7 @@ def test_rejects_invalid_notation(bad: str) -> None:
 
 
 def test_rejects_non_strings() -> None:
-    with pytest.raises(CompactError):
+    with pytest.raises(TypeError):
         parse(1200)  # type: ignore[arg-type]
 
 

@@ -8,8 +8,9 @@ from collections.abc import Sequence
 from decimal import Decimal
 
 from . import __version__
+from ._errors import CompactError
 from ._format import format as format_number
-from ._parse import CompactError, parse, parse_decimal
+from ._parse import parse, parse_decimal
 from ._scales import BASES, STYLES
 
 _EXAMPLES = """examples:
