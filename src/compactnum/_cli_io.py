@@ -85,6 +85,16 @@ class Parser(argparse.ArgumentParser):
         # reports a value that is not finite; any other dash and letter stays an option.
         self._negative_number_matcher = _NEGATIVE_VALUE
 
+    def _get_values(self, action: argparse.Action, arg_strings: list[str]) -> Any:
+        # Before 3.12 argparse drops "--" from an option's values, so "--unit=--" gave
+        # the option an empty list that skipped its checks; read it as the text "--",
+        # as later versions do.
+        if action.option_strings and action.nargs is None and arg_strings == ["--"]:
+            value = self._get_value(action, "--")
+            self._check_value(action, value)
+            return value
+        return super()._get_values(action, arg_strings)
+
     def error(self, message: str) -> NoReturn:
         self.exit(2, f"{self.format_usage()}{self.prog}: error: {bounded(message)}\n")
 

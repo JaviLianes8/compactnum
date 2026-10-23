@@ -156,10 +156,15 @@ def test_numpy_values_that_hold_no_real_number_are_refused() -> None:
         np.array(b"1200"),
         np.array(np.timedelta64(5, "s")),
         np.array(Decimal(5), dtype=object),
+        np.array(np.void(b"12")),
     ):
         with pytest.raises(TypeError, match=r"^value must be a real number, not numpy\.ndarray$"):
             format(value)
-    for value, name in ((np.str_("1200"), "str_"), (np.timedelta64(5, "s"), "timedelta64")):
+    for value, name in (
+        (np.str_("1200"), "str_"),
+        (np.timedelta64(5, "s"), "timedelta64"),
+        (np.void(b"12"), "void"),
+    ):
         with pytest.raises(TypeError, match=rf"^value must be a real number, not numpy\.{name}$"):
             format(value)
 

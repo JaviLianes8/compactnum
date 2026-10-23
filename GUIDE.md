@@ -20,7 +20,9 @@ mantissa to `precision` decimals and writes the suffix.
   objects whose `__float__` refuses (a NumPy array of several elements) raise
   `TypeError`, which names a type outside the builtins by module, as in `numpy.bool`.
   Infinities, NaNs, values with more than 4300 integer digits and a value read through
-  `float()` that is too large for one (`Fraction(10**400)`) raise `ValueError`.
+  `float()` that is too large for one (`Fraction(10**400)`) raise `ValueError`. A
+  `ValueError` that the value's own `__float__` or `__index__` raises reaches the caller
+  unchanged.
 - **Rounding** is half-up: ties go away from zero. It works on the exact decimal value,
   so the result never depends on binary floating point or on the caller's `decimal`
   context.
@@ -170,7 +172,9 @@ before it (`compactnum parse -- -1.2k`) works too. That covers `-inf` and `-nan`
 `format` rejects as not finite (exit 1). Any other value that starts with a dash, such
 as `-k`, is read as an option, so it is a usage error unless `--` comes before it
 (`compactnum parse -- -k`). An option's value that starts with a dash is joined to it
-with `=`, as in `compactnum parse 1k-B --unit=-B`; `--` does not help there.
+with `=`, as in `compactnum parse 1k-B --unit=-B`; `--` does not help there. The
+value `--` itself works the same way on every supported Python: `--unit=--` is the
+unit `--`, and `--precision=--` is a usage error.
 
 Exit codes: 0 done; 1 the value was rejected, or the output could not be written (a
 closed pipe, or a unit the output encoding cannot hold); 2 bad usage, including an

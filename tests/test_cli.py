@@ -112,6 +112,7 @@ def test_version_and_help(capsys: pytest.CaptureFixture[str]) -> None:
     assert _run(capsys, "--version") == (0, f"compactnum {__version__}\n", "")
     code, out, _ = _run(capsys, "--help")
     assert code == 0 and "compactnum parse -1.2k " in out
+    assert "An option value that starts with a dash takes =, as in --unit=-B." in out
     code, out, _ = _run(capsys, "format", "--help")
     assert code == 0 and "{short,metric,long,si}" in out and "(default short)" in out
 
@@ -157,3 +158,25 @@ def test_a_closed_output_pipe_exits_quietly() -> None:
     done = subprocess.run([sys.executable, "-c", code], capture_output=True, env=env, timeout=60)
     status, length = done.stdout.split()
     assert status in (b"0", b"1") and length == b"0"
+
+
+@pytest.mark.parametrize(
+    ("args", "code", "expected"),
+    [
+        (["format", "1500", "--unit=--"], 0, b"1.5k--"),
+        (["parse", "1k--", "--unit=--"], 0, b"1000"),
+        (["parse", "1k", "--unit=--"], 1, b"compactnum: error: missing the unit '--'"),
+        (["format", "1500", "--precision=--"], 2, b"argument --precision: invalid integer"),
+        (["format", "1500", "--base=--"], 2, b"argument --base: invalid int value: '--'"),
+        (["format", "1500", "--style=--"], 2, b"argument --style: invalid choice: '--'"),
+        (["format", "1500", "--decimal-sep=--"], 2, b"argument --decimal-sep: must be one"),
+        (["parse", "1k", "--decimal-sep=--"], 2, b"argument --decimal-sep: must be one"),
+    ],
+)
+def test_an_option_value_of_two_dashes_is_read_as_text_on_every_python(
+    args: list[str], code: int, expected: bytes
+) -> None:
+    # Before 3.12 argparse drops "--" from an option's values, which left it an empty list.
+    done = _subprocess(*args)
+    assert done.returncode == code and b"Traceback" not in done.stderr
+    assert expected in (done.stdout if code == 0 else done.stderr)
