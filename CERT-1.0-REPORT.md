@@ -16,7 +16,8 @@ Progress:
 - [x] Gates (item 15)
 - [ ] Independent reviewer (item 16)
 - [ ] Five QA lenses (item 19): round 1 reported 17 findings, all fixed at 1a86ea1; round 2
-  re-verified them and reported 9 new ones, all fixed at 7da7243; re-verification pending
+  re-verified them and reported 9 new ones, all fixed at 7da7243; round 3 re-verified those
+  and reported 9 new ones, all fixed at 0a74dcf; re-verification pending
 - [ ] PR #3 from `release/1.0.0` opened and trace guard CLEAN; merge and publish pending (item 17)
 
 ## Scorecard (items 1 to 15 and 18)
@@ -288,6 +289,63 @@ and `pytest` with `COMPACTNUM_E2E=1` (279 passed, 8 skipped: the fetched documen
 GNU numfmt are not on that PC) each exit 0. The changed CLI, value and text test files
 also pass on CPython 3.11.5 and 3.13.2 on this PC.
 
+### Round 3 (reviewed at 6b8ad33, fixed at 0a74dcf)
+
+Lenses a, d and e re-ran every round-2 finding: all fixed (lens e replayed each as a
+mutant, all killed). Lens a ran 40 probes (30 in Python, 10 CLI arguments on 3.11 and
+3.13), lens d the sdist suite against the wheel on six interpreters (275 passed, 7
+upstream skips each) and 40 probes, lens e 38 new mutants, of which 11 survived. New
+findings, all fixed; none is disputed:
+
+| Lens | Id | Severity | Finding | Fix |
+| --- | --- | --- | --- | --- |
+| a | N3 | medium | NumPy complex scalars have `__float__`, so `format(np.complex128(1500 + 5j))` printed `1.5k`, dropping the imaginary part | a `numbers.Complex` that is not `numbers.Real` is refused before `float()` is tried |
+| a | N4 | low | `format(np.array(True))` printed `1`: only the NumPy boolean scalar type was refused | any value whose `dtype.kind` is not an integer or float kind is refused, naming `numpy.ndarray`; the same check refuses 0-d string, bytes, timedelta and object arrays and `numpy.str_`, which also read as numbers, and `str` and `bytes` subclasses with `__float__` are refused too; docstring, GUIDE, CHANGELOG |
+| d | F3 | low | GUIDE said `--unit -B` works after `--`; no placement of `--` does | GUIDE and `--help` say an option value that starts with a dash takes `=` (`--unit=-B`); subprocess test of `parse 1k-B --unit=-B`, `format 5 --unit=-B` and `parse --unit=-B -- -1k-B` |
+| e | E16 | medium | no test of `format`'s `value is too large for a float` | `Fraction(10**400)` and a `__float__` raising `OverflowError` must raise that `ValueError`; GUIDE, docstring and CHANGELOG name the case |
+| e | E14 | low | nothing pinned the NumPy 1 boolean name `bool_` | stand-in types named `numpy.bool` and `numpy.bool_` must be refused |
+| e | E15 | low | nothing pinned the type name for a refusing `__index__` without `__float__` | `tests/test_type_names.py` asserts the module-qualified name |
+| e | E17 | low | no nested type in the tests | `Outer.Inner` must be named by its qualified name |
+| e | E18 | low | the 80-character cut was not pinned | exact messages for names of 79, 80, 81 and 109 characters |
+| e | E19 | low | `-information` and `-nancy` were only tested with `format`, where a value also exits 2 | `parse` and `format` with `-information`, `-nancy`, `-infk`, `-nanB` and `-k` must exit 2 with `the following arguments are required` |
+
+Contract tests first: against 6b8ad33 the new tests failed in
+`test_complex_numbers_with_float_are_refused` and
+`test_numpy_values_that_hold_no_real_number_are_refused` (N3 and N4); the lens e and F3
+tests passed there, as they pin existing behaviour. Each surviving lens e mutant, adapted
+to the new code, and eight more for it were applied alone to a clone of 0a74dcf on
+Elena's PC (CPython 3.14.2, NumPy 2.5.4, full suite with `-x`); all killed:
+
+| Id | Mutation | Caught by |
+| --- | --- | --- |
+| S02 | NumPy boolean names `("bool",)` only | `tests/test_value_types.py::test_numpy_booleans_are_refused_under_either_name[bool_]` |
+| S11 | refusing `__index__` named by `__name__` | `tests/test_type_names.py::test_a_refusing_index_names_the_type_by_module` |
+| S14 | `OverflowError` not caught | `tests/test_value_types.py::test_a_value_too_large_for_a_float_is_a_value_error` |
+| S15 | `TypeError` for a float overflow | `tests/test_value_types.py::test_a_value_too_large_for_a_float_is_a_value_error` |
+| S25 | type named by `__name__` | `tests/test_type_names.py::test_a_nested_type_is_named_by_its_qualified_name` |
+| S26 | cut at 120 characters | `tests/test_type_names.py::test_type_names_are_cut_after_80_characters[81-80]` |
+| S27 | cut at 80 characters or more | `tests/test_type_names.py::test_type_names_are_cut_after_80_characters[80-80]` |
+| S28 | cut without `...` | `tests/test_type_names.py::test_type_names_are_cut_after_80_characters[81-80]` |
+| S35 | negative-value rule without `$` | `tests/test_cli_options.py::test_a_dash_and_a_word_is_an_option_so_the_value_is_missing` |
+| S37 | negative-value rule `inf\w*` | `tests/test_cli_options.py::test_a_dash_and_a_word_is_an_option_so_the_value_is_missing` |
+| S38 | negative-value rule `s?nan\w*` | `tests/test_cli_options.py::test_a_dash_and_a_word_is_an_option_so_the_value_is_missing` |
+| R24 | complex numbers not refused | `tests/test_value_types.py::test_complex_numbers_with_float_are_refused` |
+| R25 | data type not checked | `tests/test_value_types.py::test_numpy_values_that_hold_no_real_number_are_refused` |
+| R26 | boolean data type allowed | `tests/test_value_types.py::test_numpy_values_that_hold_no_real_number_are_refused` |
+| R27 | object data type allowed | `tests/test_value_types.py::test_numpy_values_that_hold_no_real_number_are_refused` |
+| R28 | string data type allowed | `tests/test_value_types.py::test_numpy_values_that_hold_no_real_number_are_refused` |
+| R29 | `str` and `bytes` subclasses not refused | `tests/test_value_types.py::test_values_without_a_number_protocol_are_still_refused` |
+| R30 | unsigned data type refused | `tests/test_value_types.py::test_numpy_values_follow_the_annotation` |
+
+R29 survived the first pass (a `str` subclass with `__float__` had no test); the test was
+added in 0a74dcf and the whole table above is the rerun.
+
+Gates at 0a74dcf: `ruff format --check .`, `ruff check .`, `mypy --strict src` and
+`mypy --strict src tests` exit 0 on this PC (CPython 3.13.2, NumPy 2.5.4). On Elena's PC
+(CPython 3.14.2, NumPy 2.5.4, a clone of the branch) `pytest` exits 0 (309 collected),
+and so does `pytest` with `COMPACTNUM_E2E=1` (301 passed, 8 skipped: the fetched documents
+and GNU numfmt are not on that PC).
+
 ### Disputed findings
 
-None in rounds 1 and 2.
+None in rounds 1 to 3.
