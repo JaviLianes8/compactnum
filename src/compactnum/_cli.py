@@ -42,14 +42,6 @@ def _number(text: str) -> Decimal:
 _number.__name__ = "number"  # argparse names the type in its messages
 
 
-def _plain(value: Decimal) -> str:
-    """Render a Decimal in plain notation without trailing zeros or an exponent."""
-    text = f"{value:f}"
-    if "." in text:
-        text = text.rstrip("0").rstrip(".")
-    return text
-
-
 def _build_parser() -> argparse.ArgumentParser:
     parser = Parser(
         prog="compactnum",
@@ -90,8 +82,9 @@ def _run(args: argparse.Namespace) -> str:
         )
     value = parse_decimal(args.text, unit=args.unit, decimal_sep=args.decimal_sep)
     if args.exact or value.as_tuple().exponent == 0:
-        # Whole values print through Decimal: no int-to-str digit limit applies.
-        return _plain(value)
+        # parse_decimal gives whole values exponent 0 and others no trailing zeros, so
+        # plain notation is exact; Decimal has no int-to-str digit limit.
+        return f"{value:f}"
     result = float(value)  # what parse() returns for a value that is not whole
     if math.isinf(result):
         raise CompactError("too large for a float; use --exact")

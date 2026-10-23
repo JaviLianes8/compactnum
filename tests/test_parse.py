@@ -92,3 +92,35 @@ def test_rejects_non_strings() -> None:
 def test_rejects_bad_decimal_separator() -> None:
     with pytest.raises(ValueError):
         parse("1.2k", decimal_sep="99")
+
+
+def test_messages_quote_at_most_forty_characters() -> None:
+    with pytest.raises(CompactError) as info:
+        parse("x" * 40)
+    assert str(info.value) == f"not compact notation: {'x' * 40!r}"
+    with pytest.raises(CompactError) as info:
+        parse("x" * 41)
+    assert str(info.value) == f"not compact notation: {'x' * 40!r}... (41 characters)"
+    with pytest.raises(CompactError) as info:
+        parse("1" + "q" * 500)
+    assert str(info.value) == f"unknown suffix: {'q' * 40!r}... (500 characters)"
+    with pytest.raises(CompactError) as info:
+        parse("1k", unit="B" * 50)
+    assert len(str(info.value)) < 120
+
+
+def test_digit_limit_is_exactly_4300() -> None:
+    assert parse_decimal("9" * 4300) == Decimal("9" * 4300)
+    assert parse_decimal("9" * 2150 + "." + "9" * 2150) == Decimal("9" * 2150 + "." + "9" * 2150)
+    with pytest.raises(CompactError, match="more than 4300 digits"):
+        parse_decimal("9" * 4301)
+    with pytest.raises(CompactError, match="more than 4300 digits"):
+        parse_decimal("9" * 2150 + "." + "9" * 2151 + "k")
+
+
+def test_explicit_plus_sign_and_ascii_digits_only() -> None:
+    assert parse_decimal("+1.5k") == Decimal(1500)
+    odd = [chr(0x661) + chr(0x662) + "k", chr(0xFF11) + "k", "1" + chr(0xB2) + "k"]
+    for text in [*odd, "++1k", "+-1k"]:
+        with pytest.raises(CompactError):
+            parse(text)

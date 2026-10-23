@@ -1,6 +1,8 @@
+from decimal import Decimal
+
 import pytest
 
-from compactnum import format
+from compactnum import format, parse
 
 
 def test_formats_each_scale() -> None:
@@ -107,3 +109,30 @@ def test_rejects_bad_decimal_separator() -> None:
         format(1000, decimal_sep=",,")
     with pytest.raises(ValueError):
         format(1000, decimal_sep="k")
+
+
+@pytest.mark.parametrize("separator", ["+", "-", "k", "5", " ", "", ",,", chr(0x663)])
+def test_rejects_unsafe_decimal_separators(separator: str) -> None:
+    with pytest.raises(ValueError):
+        format(1500, decimal_sep=separator)
+    with pytest.raises(ValueError):
+        parse("1.5k", decimal_sep=separator)
+
+
+def test_integer_options_refuse_bool_and_bounds() -> None:
+    with pytest.raises(TypeError):
+        format(1200, precision=True)
+    with pytest.raises(TypeError):
+        format(1200, base=True)
+    assert format(1200, precision=4300, trim_zeros=False) == "1.2" + "0" * 4299 + "k"
+    with pytest.raises(ValueError, match="between 0 and 4300"):
+        format(1200, precision=4301)
+
+
+def test_value_limits_are_exact() -> None:
+    assert format(10**4300 - 1, precision=0) == "1" + "0" * 4270 + "No"
+    with pytest.raises(ValueError):
+        format(10**4300)
+    with pytest.raises(ValueError):
+        format(Decimal("1e4300"))
+    assert format(Decimal("9.99e4299"), precision=0) == "999" + "0" * 4267 + "No"
