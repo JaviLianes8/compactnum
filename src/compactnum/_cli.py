@@ -1,39 +1,49 @@
-"""Command-line interface for compactnum: ``compactnum format`` and ``parse``."""
+"""Command-line interface for compactnum: ``compactnum format`` and ``compactnum parse``."""
 
 from __future__ import annotations
 
 import argparse
-import sys
+import math
 from collections.abc import Sequence
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
 from . import __version__
+from ._cli_io import Parser, bounded, finish, write
 from ._errors import CompactError
 from ._format import format as format_number
-from ._parse import parse, parse_decimal
+from ._parse import parse_decimal
 from ._scales import BASES, STYLES
 
 _EXAMPLES = """examples:
-  compactnum format 1200                 ->  1.2k
-  compactnum format 3500000 --style long ->  3.5 million
+  compactnum format 1200                        ->  1.2k
+  compactnum format 3500000 --style long        ->  3.5 million
   compactnum format 1536 --base 1024 --unit B   ->  1.5KiB
-  compactnum format 1234 --precision 2   ->  1.23k
-  compactnum parse 1.2k                   ->  1200
-  compactnum parse 1.5KiB --unit B        ->  1536
-  compactnum parse 1,5k --decimal-sep ,   ->  1500
+  compactnum format 1234 --precision 2          ->  1.23k
+  compactnum parse 1.2k                         ->  1200
+  compactnum parse 1.5KiB --unit B              ->  1536
+  compactnum parse 1,5k --decimal-sep ,         ->  1500
+  compactnum parse 1.2345k --exact              ->  1234.5
+  compactnum parse -- -1.2k                     ->  -1200
+
+Put -- before a value that starts with a minus sign and is not a plain number.
+Exit codes: 0 done, 1 the value was rejected (or the output could not be written),
+2 bad usage.
 """
 
 
-def _number(text: str) -> float:
-    """Parse a CLI number, keeping integers exact."""
+def _number(text: str) -> Decimal:
+    """Read a command-line number exactly (integer, decimal or scientific notation)."""
     try:
-        return int(text)
-    except ValueError:
-        return float(text)
+        return Decimal(text.strip())
+    except InvalidOperation:
+        raise ValueError(text) from None
+
+
+_number.__name__ = "number"  # argparse names the type in its messages
 
 
 def _plain(value: Decimal) -> str:
-    """Render a Decimal in plain notation without trailing zeros or exponents."""
+    """Render a Decimal in plain notation without trailing zeros or an exponent."""
     text = f"{value:f}"
     if "." in text:
         text = text.rstrip("0").rstrip(".")
@@ -41,7 +51,7 @@ def _plain(value: Decimal) -> str:
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
+    parser = Parser(
         prog="compactnum",
         description="Format numbers as compact notation and parse them back.",
         epilog=_EXAMPLES,
@@ -51,7 +61,7 @@ def _build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     fmt = subparsers.add_parser("format", help="format a number into compact notation")
-    fmt.add_argument("value", type=_number, help="the number to format")
+    fmt.add_argument("value", type=_number, help="the number to format, read exactly")
     fmt.add_argument("--precision", type=int, default=1, help="mantissa decimals (default 1)")
     fmt.add_argument("--style", choices=STYLES, default="si", help="suffix style (default si)")
     fmt.add_argument("--base", type=int, choices=BASES, default=1000, help="1000 or 1024")
@@ -63,38 +73,49 @@ def _build_parser() -> argparse.ArgumentParser:
     prs.add_argument("text", help="the compact string to parse")
     prs.add_argument("--unit", default="", help="trailing unit to strip, for example B")
     prs.add_argument("--decimal-sep", default=".", help="decimal separator (default .)")
-    prs.add_argument("--exact", action="store_true", help="print an exact decimal value")
+    prs.add_argument("--exact", action="store_true", help="print the exact decimal value")
     return parser
 
 
+def _run(args: argparse.Namespace) -> str:
+    if args.command == "format":
+        return format_number(
+            args.value,
+            precision=args.precision,
+            style=args.style,
+            base=args.base,
+            unit=args.unit,
+            trim_zeros=not args.no_trim,
+            decimal_sep=args.decimal_sep,
+        )
+    value = parse_decimal(args.text, unit=args.unit, decimal_sep=args.decimal_sep)
+    if args.exact or value.as_tuple().exponent == 0:
+        # Whole values print through Decimal: no int-to-str digit limit applies.
+        return _plain(value)
+    result = float(value)  # what parse() returns for a value that is not whole
+    if math.isinf(result):
+        raise CompactError("too large for a float; use --exact")
+    return repr(result)
+
+
 def main(argv: Sequence[str] | None = None) -> int:
-    """Run the command-line interface and return a process exit code."""
+    """Run the command-line interface and return a process exit code.
+
+    Exit codes: 0 done, 1 the value was rejected or the output could not be
+    written, 2 bad usage.
+    """
     parser = _build_parser()
-    args = parser.parse_args(argv)
     try:
-        if args.command == "format":
-            print(
-                format_number(
-                    args.value,
-                    precision=args.precision,
-                    style=args.style,
-                    base=args.base,
-                    unit=args.unit,
-                    trim_zeros=not args.no_trim,
-                    decimal_sep=args.decimal_sep,
-                )
-            )
-        else:
-            if args.exact:
-                value = parse_decimal(args.text, unit=args.unit, decimal_sep=args.decimal_sep)
-                print(_plain(value))
-            else:
-                print(parse(args.text, unit=args.unit, decimal_sep=args.decimal_sep))
+        args = parser.parse_args(argv)
+    except SystemExit as stop:
+        return stop.code if isinstance(stop.code, int) else 2
+    try:
+        output = _run(args)
     except (CompactError, ValueError) as error:
-        print(f"compactnum: error: {error}", file=sys.stderr)
-        return 1
-    return 0
+        write("stderr", f"compactnum: error: {bounded(str(error))}\n")
+        return finish(1)
+    return finish(0 if write("stdout", output + "\n") else 1)
 
 
-if __name__ == "__main__":  # pragma: no cover - exercised via the console script
+if __name__ == "__main__":  # pragma: no cover - exercised through python -m compactnum
     raise SystemExit(main())
