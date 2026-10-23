@@ -64,6 +64,15 @@ def test_missing_expected_unit_is_an_error() -> None:
         parse("1.5Ki", unit="B")
 
 
+def test_text_that_is_only_the_unit_has_no_number() -> None:
+    with pytest.raises(CompactError) as info:
+        parse("B", unit="B")
+    assert str(info.value) == "not compact notation: 'B'"
+    with pytest.raises(CompactError) as info:
+        parse_decimal(" kB ", unit="KB")
+    assert str(info.value) == "not compact notation: ' kB '"
+
+
 def test_custom_decimal_separator() -> None:
     assert parse("1,5k", decimal_sep=",") == 1500
     with pytest.raises(CompactError):

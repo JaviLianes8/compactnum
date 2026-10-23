@@ -179,7 +179,7 @@ unit `--`, and `--precision=--` is a usage error.
 Exit codes: 0 done; 1 the value was rejected, or the output could not be written (a
 closed pipe, or a unit the output encoding cannot hold); 2 bad usage, including an
 invalid `--precision` or `--decimal-sep` value, named by its option. Messages go to
-stderr and are cut at 300 characters.
+stderr; one longer than 300 characters is cut to its first 300, followed by `...`.
 
 ## Compared with other packages
 

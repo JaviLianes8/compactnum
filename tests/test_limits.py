@@ -11,6 +11,8 @@ import pytest
 import reference
 
 from compactnum import CompactError, format, parse, parse_decimal
+from compactnum._cli import main
+from compactnum._cli_io import bounded
 
 BIG = 10**4300 - 1
 EDGES: list[tuple[object, dict[str, object]]] = [
@@ -105,3 +107,20 @@ def test_a_huge_integer_is_refused_at_once(value: int) -> None:
     with pytest.raises(ValueError, match="more than 4300 integer digits"):
         format(value)
     assert time.perf_counter() - start < 0.5
+
+
+def _usage_message(capsys: pytest.CaptureFixture[str], style: str) -> str:
+    assert main(["format", "1", "--style", style]) == 2
+    return capsys.readouterr().err.splitlines()[-1].split(": error: ", 1)[1]
+
+
+def test_cli_messages_are_cut_at_exactly_300_characters(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    assert bounded("m" * 300) == "m" * 300
+    assert bounded("m" * 301) == "m" * 300 + "..."
+    extra = len(_usage_message(capsys, "x")) - 1
+    whole = _usage_message(capsys, "x" * (300 - extra))
+    assert len(whole) == 300 and whole.count("x" * (300 - extra)) == 1
+    longer = whole.replace("x" * (300 - extra), "x" * (301 - extra))
+    assert _usage_message(capsys, "x" * (301 - extra)) == longer[:300] + "..."
