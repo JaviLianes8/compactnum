@@ -71,15 +71,16 @@ except CompactError as error:  # a ValueError subclass
 
 | Name | What it does |
 | --- | --- |
-| `format(value, *, precision=1, style="si", base=1000, unit="", trim_zeros=True, decimal_sep=".")` | Compact text for an `int`, `float`, `Decimal` or other real number. |
+| `format(value, *, precision=1, style="short", base=1000, unit="", trim_zeros=True, decimal_sep=".")` | Compact text for an `int`, `float`, `Decimal` or other real number. |
 | `parse(text, *, unit="", decimal_sep=".")` | The value as `int` (whole) or `float`. |
 | `parse_decimal(text, *, unit="", decimal_sep=".")` | The exact value as a `Decimal`. |
 | `CompactError` | `ValueError` subclass raised for text that is not compact notation. |
 
-Styles: `"si"` (default) and its alias `"short"` write the short-scale letters
-`k M B T Qa Qi Sx Sp Oc No`, `"metric"` the SI prefixes `k M G T P E Z Y R Q`, and
-`"long"` the words `thousand` to `nonillion`. With `base=1024` they become `Ki` to `Yi`
-(`kibi` to `yobi` under `"long"`). `parse` reads every one of them, in any case.
+Styles: `"short"` (default) writes the short-scale letters `k M B T Qa Qi Sx Sp Oc No`,
+`"metric"` the SI prefixes `k M G T P E Z Y R Q`, and `"long"` the words `thousand` to
+`nonillion`. With `base=1024` they become `Ki` to `Yi` (`kibi` to `yobi` under `"long"`).
+`parse` reads every one of them, in any case. `"si"` is the 0.x name of `"short"` and
+still works.
 
 ## Command line
 
@@ -90,12 +91,12 @@ $ compactnum format 3500000 --style long
 3.5 million
 $ compactnum parse 1.2345k --exact
 1234.5
-$ compactnum parse -- -1.2k
+$ compactnum parse -1.2k
 -1200
 ```
 
-`compactnum --help` lists every option. Exit codes: 0 done, 1 the value was rejected,
-2 bad usage.
+`compactnum --help` lists every option. Exit codes: 0 done, 1 the value was rejected or
+the output could not be written, 2 bad usage (an invalid option value included).
 
 ## Why
 

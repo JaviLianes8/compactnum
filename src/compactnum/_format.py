@@ -14,9 +14,11 @@ from decimal import (
     InvalidOperation,
     Overflow,
 )
+from typing import SupportsFloat, SupportsIndex
 
 from ._scales import (
     MAX_DIGITS,
+    check_bool,
     check_integer,
     check_text,
     format_entries,
@@ -29,10 +31,10 @@ _INT_LIMIT = 10**MAX_DIGITS
 
 
 def format(
-    value: float | Decimal,
+    value: SupportsFloat | SupportsIndex,
     *,
     precision: int = 1,
-    style: str = "si",
+    style: str = "short",
     base: int = 1000,
     unit: str = "",
     trim_zeros: bool = True,
@@ -41,33 +43,36 @@ def format(
     """Format ``value`` as compact notation.
 
     Args:
-        value: The number to render: an ``int``, a ``float``, a
-            :class:`~decimal.Decimal`, or any other real number, which is read
-            through ``float()``. A float is read as its shortest ``repr``, so
-            ``1.05`` rounds like the decimal ``1.05``. It must be finite and
-            have at most 4300 integer digits.
+        value: The number to render: an ``int`` or other integer (a NumPy
+            integer, say) and a :class:`~decimal.Decimal` are read exactly, a
+            ``float`` as its shortest ``repr`` (so ``1.05`` rounds like the
+            decimal ``1.05``), and any other real number (a
+            :class:`~fractions.Fraction`, a NumPy float) through ``float()``.
+            It must be finite and have at most 4300 integer digits.
         precision: Decimals kept in the mantissa, from ``0`` to ``4300``.
-        style: ``"si"`` or its alias ``"short"`` for short-scale letters
-            (``k M B T Qa Qi Sx Sp Oc No``), ``"metric"`` for SI prefixes
-            (``k M G T P E Z Y R Q``), or ``"long"`` for words (``thousand``
-            to ``nonillion``).
+        style: ``"short"`` for short-scale letters (``k M B T Qa Qi Sx Sp
+            Oc No``), ``"metric"`` for SI prefixes (``k M G T P E Z Y R Q``),
+            or ``"long"`` for words (``thousand`` to ``nonillion``). ``"si"``
+            is the 0.x name of ``"short"``, kept so old code runs.
         base: ``1000`` for decimal magnitudes or ``1024`` for binary (IEC)
             magnitudes (``Ki`` to ``Yi``, and ``kibi`` to ``yobi`` under ``"long"``).
         unit: Text appended exactly as given after the suffix, for example
             ``"B"`` to produce ``"1.5KiB"``.
-        trim_zeros: Drop trailing fractional zeros when true.
+        trim_zeros: Drop trailing fractional zeros when ``True``.
         decimal_sep: Single character used as the decimal point in the output.
 
     Returns:
         The compact string. Rounding is half-up (ties away from zero) and
         carries across scales, so ``999_999`` becomes ``"1M"``. A value that
         rounds to zero has no minus sign. The result is lossy by design;
-        :func:`compactnum.parse_decimal` reads back exactly the quantity shown.
+        :func:`compactnum.parse_decimal` reads back exactly the quantity shown,
+        whatever the arguments.
         Values past the largest suffix keep that suffix with a bigger mantissa.
 
     Raises:
         TypeError: If ``value`` is not a real number (``bool`` included), an
-            integer argument is not an integer, or a text argument is not a ``str``.
+            integer argument is not an integer, ``trim_zeros`` is not a ``bool``,
+            or a text argument is not a ``str``.
         ValueError: If ``value`` is not finite or too large, ``precision`` is
             out of range, or ``style``, ``base`` or ``decimal_sep`` is invalid.
 
@@ -87,7 +92,8 @@ def format(
         raise ValueError(f"precision must be between 0 and {MAX_DIGITS}")
     style = validate_style(style)
     base = validate_base(base)
-    check_text("unit", unit)
+    unit = check_text("unit", unit)
+    trim = check_bool("trim_zeros", trim_zeros)
     decimal_sep = validate_separator(decimal_sep)
 
     magnitude = number.copy_abs()
@@ -119,7 +125,7 @@ def format(
 
     sign = "-" if number < 0 and mantissa != 0 else ""
     gap = " " if style == "long" and suffix else ""
-    body = _render(mantissa, bool(trim_zeros), decimal_sep)
+    body = _render(mantissa, trim, decimal_sep)
     return f"{sign}{body}{gap}{suffix}{unit}"
 
 

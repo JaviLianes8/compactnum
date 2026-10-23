@@ -109,13 +109,11 @@ def test_messages_quote_at_most_forty_characters() -> None:
     assert len(str(info.value)) < 120
 
 
-def test_digit_limit_is_exactly_4300() -> None:
-    assert parse_decimal("9" * 4300) == Decimal("9" * 4300)
-    assert parse_decimal("9" * 2150 + "." + "9" * 2150) == Decimal("9" * 2150 + "." + "9" * 2150)
-    with pytest.raises(CompactError, match="more than 4300 digits"):
-        parse_decimal("9" * 4301)
-    with pytest.raises(CompactError, match="more than 4300 digits"):
-        parse_decimal("9" * 2150 + "." + "9" * 2151 + "k")
+def test_digit_limit_counts_digits_on_both_sides_of_the_point() -> None:
+    whole, fraction = "9" * 4300, "9" * 4300
+    assert parse_decimal(whole + "." + fraction) == Decimal(whole + "." + fraction)
+    with pytest.raises(CompactError, match="more than 8600 digits"):
+        parse_decimal(whole + "." + fraction + "9")
 
 
 def test_explicit_plus_sign_and_ascii_digits_only() -> None:

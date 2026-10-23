@@ -32,20 +32,32 @@ repository, and the changes below are measured against 0.2.0.
 
 ### Changed
 
+- The default style is named `"short"`. `"si"`, its 0.x name, is still accepted and
+  means the same short-scale letters (`1.5B`); the SI prefixes (`1.5G`) are
+  `style="metric"`, as before. The command's `--style` default is `short` too.
+- `format`'s `value` is annotated `SupportsFloat | SupportsIndex` (it was `float`), so
+  type checkers accept the `Decimal`, `Fraction` and NumPy values it reads.
 - `format` computes with exact decimal arithmetic whatever the size of the value. In
   0.2.0 it used the caller's `decimal` context (28 digits by default), so
   `format(123456789012345678901234567890123, precision=3)` printed `123456789.012Sp`, and
   a context with `prec=3` made it raise `InvalidOperation`.
 - `format` raises `TypeError` for a value that is not a real number: `bool` and strings
   included (0.2.0 formatted `"1200"`), and for a `precision` that is not an integer or a
-  `unit` that is not a string (0.2.0 appended `5` for `unit=5`). It raises `ValueError`
+  `unit` that is not a string (0.2.0 appended `5` for `unit=5`), and for a `trim_zeros`
+  that is not a `bool` (0.2.0 read any value as true or false, so `trim_zeros="False"`
+  trimmed). It raises `ValueError`
   for a value that is not finite (0.2.0 raised `decimal.InvalidOperation`), for a value
   with more than 4300 integer digits and for a `precision` above 4300.
 - `parse` and `parse_decimal` raise `TypeError`, not `CompactError`, when `text` is not
   a string, and `TypeError` when `unit` or `decimal_sep` is not a string (0.2.0 raised
-  `AttributeError`).
+  `AttributeError` for `unit`).
+- A `str` subclass passed as text, `style`, `unit` or `decimal_sep`, such as a string
+  enum member, is read by its characters, never by its own `__str__` or `__eq__`.
 - Only ASCII digits are read: 0.2.0 read `"١٢k"` (Arabic-Indic digits) as 12000.
-  At most 4300 digits are read.
+  At most 8600 digits are read, which covers the longest text `format` writes, so every
+  result of `format` reads back.
+- `unit` is matched by Unicode case folding, so `"SS"` matches `"ß"` (0.2.0 compared
+  lower case, and failed whenever folding changes the length).
 - `parse_decimal` returns whole values with exponent 0 and other values without
   trailing zeros (0.2.0 returned `Decimal('1200.0')` for `"1.2k"`), and zero without a
   sign; a caller context no longer rounds the result.
@@ -59,6 +71,11 @@ repository, and the changes below are measured against 0.2.0.
   any value with a point), prints whole results of any size, cuts messages at 300
   characters, exits 1 quietly when its output pipe closes, and reports output its
   encoding cannot hold instead of failing with a traceback.
+- The command reads a value that starts with a minus sign (`format -1e3`,
+  `parse -1.2k`) the same way on every Python version; before 3.14, argparse took such a
+  value for an option unless `--` came first.
+- An invalid `--precision` or `--decimal-sep` value is a usage error (exit 2) that names
+  the option, like every other invalid option.
 - `Development Status :: 5 - Production/Stable`.
 
 ## [0.2.0]

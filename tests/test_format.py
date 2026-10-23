@@ -57,8 +57,12 @@ def test_long_style_uses_words_with_a_space() -> None:
     assert format(500, style="long") == "500"
 
 
-def test_short_style_is_an_alias_of_si() -> None:
-    assert format(2_000_000_000, style="short") == format(2_000_000_000, style="si")
+def test_short_is_the_default_style_and_si_its_older_name() -> None:
+    assert format(2_000_000_000) == format(2_000_000_000, style="short") == "2B"
+    assert format(2_000_000_000, style="si") == "2B"
+    assert format(2_000_000_000_000_000_000, style="si") == "2Qi"
+    with pytest.raises(ValueError, match="choose from short, metric, long, si"):
+        format(1, style="SI")
 
 
 def test_metric_style_uses_true_si_prefixes() -> None:

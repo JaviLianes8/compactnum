@@ -13,7 +13,7 @@ import reference
 from compactnum import format, parse, parse_decimal
 
 SEEDS = [1, 2, 3]
-STYLES = ["si", "short", "metric", "long"]
+STYLES = ["short", "metric", "long", "si"]
 ARABIC_SEPARATOR = chr(0x066B)
 MICRO = chr(0x00B5)
 

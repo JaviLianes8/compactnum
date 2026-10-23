@@ -12,7 +12,7 @@ from ._cli_io import Parser, bounded, finish, write
 from ._errors import CompactError
 from ._format import format as format_number
 from ._parse import parse_decimal
-from ._scales import BASES, STYLES
+from ._scales import BASES, MAX_DIGITS, STYLES, validate_separator
 
 _EXAMPLES = """examples:
   compactnum format 1200                        ->  1.2k
@@ -23,11 +23,11 @@ _EXAMPLES = """examples:
   compactnum parse 1.5KiB --unit B              ->  1536
   compactnum parse 1,5k --decimal-sep ,         ->  1500
   compactnum parse 1.2345k --exact              ->  1234.5
-  compactnum parse -- -1.2k                     ->  -1200
+  compactnum parse -1.2k                        ->  -1200
 
-Put -- before a value that starts with a minus sign and is not a plain number.
+A value may start with a minus sign on every Python version; -- before it works too.
 Exit codes: 0 done, 1 the value was rejected (or the output could not be written),
-2 bad usage.
+2 bad usage (an invalid option value included).
 """
 
 
@@ -39,7 +39,25 @@ def _number(text: str) -> Decimal:
         raise ValueError(text) from None
 
 
-_number.__name__ = "number"  # argparse names the type in its messages
+def _precision(text: str) -> int:
+    number = int(text)  # a ValueError reads as "invalid integer value"
+    if not 0 <= number <= MAX_DIGITS:
+        raise argparse.ArgumentTypeError(f"must be between 0 and {MAX_DIGITS}")
+    return number
+
+
+def _separator(text: str) -> str:
+    try:
+        return validate_separator(text)
+    except ValueError:
+        raise argparse.ArgumentTypeError(
+            "must be one character that is not a digit, letter, sign or space"
+        ) from None
+
+
+# argparse names the type in its messages.
+_number.__name__ = "number"
+_precision.__name__ = "integer"
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -54,17 +72,19 @@ def _build_parser() -> argparse.ArgumentParser:
 
     fmt = subparsers.add_parser("format", help="format a number into compact notation")
     fmt.add_argument("value", type=_number, help="the number to format, read exactly")
-    fmt.add_argument("--precision", type=int, default=1, help="mantissa decimals (default 1)")
-    fmt.add_argument("--style", choices=STYLES, default="si", help="suffix style (default si)")
+    fmt.add_argument("--precision", type=_precision, default=1, help="mantissa decimals, 0 to 4300")
+    fmt.add_argument(
+        "--style", choices=STYLES, default="short", help="suffix style (default short)"
+    )
     fmt.add_argument("--base", type=int, choices=BASES, default=1000, help="1000 or 1024")
     fmt.add_argument("--unit", default="", help="trailing unit, for example B")
-    fmt.add_argument("--decimal-sep", default=".", help="decimal separator (default .)")
+    fmt.add_argument("--decimal-sep", type=_separator, default=".", help="decimal separator")
     fmt.add_argument("--no-trim", action="store_true", help="keep trailing zeros")
 
     prs = subparsers.add_parser("parse", help="parse compact notation into a number")
     prs.add_argument("text", help="the compact string to parse")
     prs.add_argument("--unit", default="", help="trailing unit to strip, for example B")
-    prs.add_argument("--decimal-sep", default=".", help="decimal separator (default .)")
+    prs.add_argument("--decimal-sep", type=_separator, default=".", help="decimal separator")
     prs.add_argument("--exact", action="store_true", help="print the exact decimal value")
     return parser
 

@@ -79,7 +79,7 @@ def render(
     value: object,
     *,
     precision: int = 1,
-    style: str = "si",
+    style: str = "short",
     base: int = 1000,
     unit: str = "",
     trim_zeros: bool = True,
@@ -103,7 +103,7 @@ def render(
     return f"{sign}{text}{gap}{names[index]}{unit}"
 
 
-def shown(value: object, *, precision: int = 1, style: str = "si", base: int = 1000) -> Fraction:
+def shown(value: object, *, precision: int = 1, style: str = "short", base: int = 1000) -> Fraction:
     """The exact quantity that ``format`` shows, suffix applied."""
     names = suffixes(style, base)
     mantissa, index = rounded(value, precision, base, len(names))

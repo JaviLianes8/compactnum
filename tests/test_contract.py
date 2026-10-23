@@ -21,7 +21,8 @@ ROOT = Path(__file__).resolve().parents[1]
 PUBLIC_API = ["CompactError", "format", "parse", "parse_decimal"]
 
 SIGNATURES = {
-    "format": "(value: 'float | Decimal', *, precision: 'int' = 1, style: 'str' = 'si', "
+    "format": "(value: 'SupportsFloat | SupportsIndex', *, precision: 'int' = 1, "
+    "style: 'str' = 'short', "
     "base: 'int' = 1000, unit: 'str' = '', trim_zeros: 'bool' = True, "
     "decimal_sep: 'str' = '.') -> 'str'",
     "parse": "(text: 'str', *, unit: 'str' = '', decimal_sep: 'str' = '.') -> 'int | float'",

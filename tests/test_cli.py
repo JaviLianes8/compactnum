@@ -69,7 +69,7 @@ def test_parse_exact_keeps_every_digit(capsys: pytest.CaptureFixture[str]) -> No
         ["parse", "9" * 400 + ".3Yi"],
         ["format", "nan"],
         ["format", "1" * 5000],
-        ["format", "12", "--decimal-sep", "ab"],
+        ["format", "1e4300"],
     ],
 )
 def test_rejected_values_exit_one_with_a_short_message(
@@ -111,7 +111,9 @@ def test_too_large_for_a_float_suggests_exact(capsys: pytest.CaptureFixture[str]
 def test_version_and_help(capsys: pytest.CaptureFixture[str]) -> None:
     assert _run(capsys, "--version") == (0, f"compactnum {__version__}\n", "")
     code, out, _ = _run(capsys, "--help")
-    assert code == 0 and "compactnum parse -- -1.2k" in out
+    assert code == 0 and "compactnum parse -1.2k " in out
+    code, out, _ = _run(capsys, "format", "--help")
+    assert code == 0 and "{short,metric,long,si}" in out and "(default short)" in out
 
 
 def _subprocess(

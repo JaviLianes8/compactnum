@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 import sys
-from typing import TYPE_CHECKING, NoReturn
+from typing import TYPE_CHECKING, Any, NoReturn
 
 if TYPE_CHECKING:
     from _typeshed import SupportsWrite
@@ -71,6 +72,13 @@ class Parser(argparse.ArgumentParser):
     """An argument parser whose errors are bounded and survive a closed stream."""
 
     lost_output = False  # set when help or version text could not be written
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        # Up to 3.13 argparse takes "-1e3" or "-1.2k" for an option; 3.14 reads any
+        # "-digit" or "-.digit" as a value. No option here looks like a number, so the
+        # 3.14 rule is set on every version and they all behave the same.
+        self._negative_number_matcher = re.compile(r"-\.?\d")
 
     def error(self, message: str) -> NoReturn:
         self.exit(2, f"{self.format_usage()}{self.prog}: error: {bounded(message)}\n")

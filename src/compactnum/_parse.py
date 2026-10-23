@@ -16,16 +16,16 @@ from decimal import (
 )
 
 from ._errors import CompactError, excerpt
-from ._scales import MAX_DIGITS, MULTIPLIERS, check_text, validate_separator
+from ._scales import MULTIPLIERS, PARSE_DIGITS, check_text, validate_separator
 
 # ASCII digits only: a sign, digits with an optional fraction, optional
 # whitespace, then letters for the suffix.
 _PATTERN = re.compile(r"([+-]?)([0-9]+(?:\.[0-9]+)?)\s*([A-Za-z]*)")
 
-# Wide enough for MAX_DIGITS digits times the largest multiplier (2**80, 25 digits),
+# Wide enough for PARSE_DIGITS digits times the largest multiplier (2**80, 25 digits),
 # so every product is exact; Inexact is trapped to prove it.
 _EXACT = Context(
-    prec=MAX_DIGITS + 64,
+    prec=PARSE_DIGITS + 64,
     Emax=MAX_EMAX,
     Emin=MIN_EMIN,
     traps=[InvalidOperation, DivisionByZero, Overflow, Inexact],
@@ -38,12 +38,14 @@ def parse_decimal(text: str, *, unit: str = "", decimal_sep: str = ".") -> Decim
 
     This is the exact counterpart of :func:`parse`: it never loses precision to
     binary floating point, so it is the right choice for very large magnitudes
-    or for money. Suffixes and the unit are matched case-insensitively, and
-    whitespace is allowed around the text and before the suffix.
+    or for money. Suffixes and the unit are matched case-insensitively (the unit
+    by Unicode case folding, so ``"SS"`` matches ``"ß"``), and whitespace is
+    allowed around the text and before the suffix. It reads back exactly the
+    quantity :func:`compactnum.format` shows, for any arguments.
 
     Args:
         text: The compact string, for example ``"1.2k"`` or ``"1.5 KiB"``: an
-            optional sign, ASCII digits with an optional fraction (at most 4300
+            optional sign, ASCII digits with an optional fraction (at most 8600
             digits in all), and an optional suffix from any style.
         unit: A trailing unit to strip before parsing, mirroring
             :func:`compactnum.format`. ``"B"`` reads ``"1.5KiB"`` as ``1.5Ki``.
@@ -56,7 +58,7 @@ def parse_decimal(text: str, *, unit: str = "", decimal_sep: str = ".") -> Decim
 
     Raises:
         CompactError: If ``text`` is not compact notation, lacks ``unit``, or
-            has more than 4300 digits.
+            has more than 8600 digits.
         TypeError: If ``text``, ``unit`` or ``decimal_sep`` is not a ``str``.
         ValueError: If ``decimal_sep`` is not one safe character.
 
@@ -68,16 +70,16 @@ def parse_decimal(text: str, *, unit: str = "", decimal_sep: str = ".") -> Decim
         >>> parse_decimal("1.2345k")
         Decimal('1234.5')
     """
-    check_text("text", text)
+    text = check_text("text", text)
     wanted = check_text("unit", unit).strip()
     decimal_sep = validate_separator(decimal_sep)
 
     body = text.strip()
     if wanted:
-        cut = len(body) - len(wanted)
-        if cut < 0 or body[cut:].casefold() != wanted.casefold():
+        rest = _without_unit(body, wanted.casefold())
+        if rest is None:
             raise CompactError(f"missing the unit {excerpt(wanted)}: {excerpt(text)}")
-        body = body[:cut].rstrip()
+        body = rest.rstrip()
     if decimal_sep != ".":
         if "." in body:
             raise CompactError(f"unexpected '.' for decimal_sep {decimal_sep!r}: {excerpt(text)}")
@@ -87,8 +89,8 @@ def parse_decimal(text: str, *, unit: str = "", decimal_sep: str = ".") -> Decim
     if match is None:
         raise CompactError(f"not compact notation: {excerpt(text)}")
     sign, digits, suffix = match.groups()
-    if len(digits) - digits.count(".") > MAX_DIGITS:
-        raise CompactError(f"more than {MAX_DIGITS} digits: {excerpt(text)}")
+    if len(digits) - digits.count(".") > PARSE_DIGITS:
+        raise CompactError(f"more than {PARSE_DIGITS} digits: {excerpt(text)}")
     factor = MULTIPLIERS.get(suffix.lower())
     if factor is None:
         raise CompactError(f"unknown suffix: {excerpt(suffix)}")
@@ -101,12 +103,32 @@ def parse_decimal(text: str, *, unit: str = "", decimal_sep: str = ".") -> Decim
     return value.normalize(context=_EXACT)
 
 
+def _without_unit(body: str, folded: str) -> str | None:
+    """Return ``body`` without a trailing unit whose case fold is ``folded``, or None.
+
+    Folding can change the length (``"ß"`` folds to ``"ss"``), so characters are
+    folded one by one from the end until they cover the unit. Each folds to at least
+    one character, so this looks at no more characters than the folded unit has.
+    """
+    pieces: list[str] = []
+    size = 0
+    cut = len(body)
+    while size < len(folded) and cut > 0:
+        cut -= 1
+        pieces.append(body[cut].casefold())
+        size += len(pieces[-1])
+    if "".join(reversed(pieces)) != folded:
+        return None
+    return body[:cut]
+
+
 def parse(text: str, *, unit: str = "", decimal_sep: str = ".") -> int | float:
     """Parse ``text`` into a number, inverting :func:`compactnum.format`.
 
     A whole result is returned as ``int``, otherwise as the nearest ``float``.
     For exact arithmetic without float rounding, use :func:`parse_decimal`; the
-    two accept exactly the same text.
+    two read the same syntax, and ``parse`` also refuses a value that is not
+    whole and too large for a ``float``.
 
     Args:
         text: The compact string, for example ``"1.2k"`` or ``"1.5 thousand"``.

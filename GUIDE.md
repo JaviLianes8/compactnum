@@ -5,14 +5,15 @@ a comment line after a `print` holds what it prints.
 
 ## Formatting
 
-`format(value, *, precision=1, style="si", base=1000, unit="", trim_zeros=True,
+`format(value, *, precision=1, style="short", base=1000, unit="", trim_zeros=True,
 decimal_sep=".")` picks the largest scale not above the value, divides, rounds the
 mantissa to `precision` decimals and writes the suffix.
 
 - **Input.** An integer (`int`, a NumPy integer) and a `Decimal` are read exactly, a
   `float` as its shortest `repr` (so `1.05` rounds like the decimal 1.05, not like the
   binary value just below it), and any other real number (a `Fraction`, a NumPy float)
-  through `float()`.
+  through `float()`. `value` is annotated `SupportsFloat | SupportsIndex`, so a type
+  checker accepts all of them.
   `bool`, strings, `None` and complex numbers raise `TypeError`. Infinities, NaNs and
   values with more than 4300 integer digits raise `ValueError`.
 - **Rounding** is half-up: ties go away from zero. It works on the exact decimal value,
@@ -23,10 +24,12 @@ mantissa to `precision` decimals and writes the suffix.
   `1000No`.
 - **Zero** has no sign: `-0.04` is `0`, and so is `-0.0`.
 - **Trimming.** Trailing fractional zeros are dropped, then a bare decimal point;
-  `trim_zeros=False` keeps exactly `precision` decimals.
+  `trim_zeros=False` keeps exactly `precision` decimals. `trim_zeros` must be a `bool`.
 - `precision` is an integer from 0 to 4300 (any `__index__` integer, `bool` refused),
   `base` is 1000 or 1024, `unit` any string appended exactly as given, and
   `decimal_sep` a single character that is not a digit, a letter, a sign or whitespace.
+  A `str` subclass, such as a string enum member, is read by its characters, never by
+  its own `__str__`.
 
 ```python
 from compactnum import format
@@ -41,7 +44,7 @@ print(format(2000, trim_zeros=False), format(2000, precision=0), format(1234.5, 
 
 ### Styles and bases
 
-| Scale | `"si"`, `"short"` | `"metric"` | `"long"` | `base=1024` | `base=1024`, `"long"` |
+| Scale | `"short"` | `"metric"` | `"long"` | `base=1024` | `base=1024`, `"long"` |
 | --- | --- | --- | --- | --- | --- |
 | 1 | `k` | `k` | `thousand` | `Ki` | `kibi` |
 | 2 | `M` | `M` | `million` | `Mi` | `mebi` |
@@ -53,6 +56,9 @@ print(format(2000, trim_zeros=False), format(2000, precision=0), format(1234.5, 
 | 8 | `Sp` | `Y` | `septillion` | `Yi` | `yobi` |
 | 9 | `Oc` | `R` | `octillion` | | |
 | 10 | `No` | `Q` | `nonillion` | | |
+
+`"short"` is the default. `"si"` is its 0.x name, still accepted; it writes the
+short-scale letters, not the SI prefixes, which `"metric"` writes.
 
 Scale *n* is 1000<sup>*n*</sup>, or 1024<sup>*n*</sup> with `base=1024`. Sources: the
 SI prefixes are the BIPM list (with `ronna` and `quetta` from 2022), the binary prefixes
@@ -78,15 +84,17 @@ print(format(1500, unit=" ms"), format(1500, decimal_sep=","))
 ## Parsing
 
 `parse_decimal(text, *, unit="", decimal_sep=".")` reads an optional sign, ASCII digits
-with an optional fraction (at most 4300 digits in all), optional whitespace and a suffix
+with an optional fraction (at most 8600 digits in all, which covers anything `format`
+writes), optional whitespace and a suffix
 from any style or base, and returns the exact `Decimal`. `parse` is the same reading
 with an `int` result when the value is whole and the nearest `float` otherwise.
 
 - Suffixes are matched without case: `1.2K`, `1.2k`, `3 MILLION` and `1mi` are all
   valid. So `m` is million (mega), never milli, and `e` is exa.
 - Whitespace is allowed around the text and between the number and the suffix.
-- `unit` is stripped from the end first, without case and ignoring whitespace around
-  the unit itself; text without it raises `CompactError`. `"B"` reads `"1.5KiB"` as
+- `unit` is stripped from the end first, without case (Unicode case folding, so `SS`
+  matches `ß`) and ignoring whitespace around the unit itself; text without it raises
+  `CompactError`. `"B"` reads `"1.5KiB"` as
   `1.5Ki`. Without `unit`, a trailing `B` is the short-scale billion.
 - With a `decimal_sep` other than `.`, a `.` in the text is an error, so `1.5k` is not
   silently read as 15k.
@@ -120,7 +128,9 @@ for text in ["1e3", "1,200", ".5k", "1.5kk"]:
 ## Round trips
 
 `format` is lossy by design: it shows a rounded quantity. `parse_decimal` reads back
-exactly that quantity, with the same `unit` and `decimal_sep`, in every style and base.
+exactly that quantity, with the same `unit` and `decimal_sep`, in every style and base,
+for every argument `format` accepts: its longest output, 8576 digits (a 4300-digit value
+over `Yi` at precision 4300), is within the 8600 digits the parser reads.
 
 ```python
 from compactnum import format, parse_decimal
@@ -134,9 +144,9 @@ print(text, parse_decimal(text, unit="B"))
 
 | Situation | Exception |
 | --- | --- |
-| Text that is not compact notation, lacks the unit, or has more than 4300 digits | `CompactError` |
+| Text that is not compact notation, lacks the unit, or has more than 8600 digits | `CompactError` |
 | A value that is not whole and too large for a `float`, in `parse` | `CompactError` |
-| An argument of the wrong type (`parse(12)`, `format("12")`, `format(True)`) | `TypeError` |
+| An argument of the wrong type (`parse(12)`, `format("12")`, `format(True)`, `trim_zeros="no"`) | `TypeError` |
 | An invalid `style`, `base`, `precision` or `decimal_sep`, a non-finite or too large value | `ValueError` |
 
 `CompactError` subclasses `ValueError`, so `except ValueError` catches every value error.
@@ -149,11 +159,13 @@ lands whole in a log.
 `--base`, `--unit`, `--decimal-sep`, `--no-trim`) and reads `VALUE` exactly as a
 decimal (scientific notation allowed). `compactnum parse TEXT` takes `--unit`,
 `--decimal-sep` and `--exact`; it prints whole values in full, other values as the
-nearest float, or the exact decimal with `--exact`. Put `--` before a value that starts
-with a minus sign and is not a plain number: `compactnum parse -- -1.2k`.
+nearest float, or the exact decimal with `--exact`. A value may start with a minus sign
+(`compactnum format -1e3`, `compactnum parse -1.2k`) on every supported Python; `--`
+before it (`compactnum parse -- -1.2k`) works too.
 
 Exit codes: 0 done; 1 the value was rejected, or the output could not be written (a
-closed pipe, or a unit the output encoding cannot hold); 2 bad usage. Messages go to
+closed pipe, or a unit the output encoding cannot hold); 2 bad usage, including an
+invalid `--precision` or `--decimal-sep` value, named by its option. Messages go to
 stderr and are cut at 300 characters.
 
 ## Compared with other packages

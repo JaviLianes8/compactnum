@@ -13,9 +13,14 @@ from __future__ import annotations
 import operator
 from decimal import Decimal
 
-#: Most digits a number may have, on the way in and on the way out. It mirrors
+#: Most integer digits of a value to format, and the largest precision. It mirrors
 #: CPython's default limit for converting between ``int`` and ``str``.
 MAX_DIGITS = 4300
+
+#: Most digits the parser reads. Twice MAX_DIGITS covers the longest number format
+#: writes (8576 digits: 4276 integer digits over 2**80, then 4300 decimals), so
+#: every result of format reads back.
+PARSE_DIGITS = 2 * MAX_DIGITS
 
 # Exponent of 10, short-scale letter, SI prefix, short-scale word.
 DECIMAL_SCALES: tuple[tuple[int, str, str, str], ...] = (
@@ -44,14 +49,15 @@ BINARY_SCALES: tuple[tuple[int, str, str], ...] = (
     (80, "Yi", "yobi"),
 )
 
-#: Accepted ``style`` values. ``"si"`` and ``"short"`` are the same short-scale
-#: letters; ``"metric"`` is the SI column; ``"long"`` is the words.
-STYLES: tuple[str, ...] = ("si", "short", "metric", "long")
+#: Accepted ``style`` values. ``"short"`` is the short-scale letters, ``"metric"``
+#: the SI column and ``"long"`` the words. ``"si"`` is the 0.x name of ``"short"``,
+#: kept so old code runs; it is not the SI column.
+STYLES: tuple[str, ...] = ("short", "metric", "long", "si")
 
 #: Accepted ``base`` values: decimal (1000) and binary (1024).
 BASES: tuple[int, ...] = (1000, 1024)
 
-_COLUMN = {"si": 1, "short": 1, "metric": 2, "long": 3}
+_COLUMN = {"short": 1, "si": 1, "metric": 2, "long": 3}
 
 
 def format_entries(base: int, style: str) -> tuple[tuple[Decimal, str], ...]:
@@ -82,9 +88,20 @@ MULTIPLIERS: dict[str, Decimal] = _build_multipliers()
 
 
 def check_text(name: str, value: object) -> str:
-    """Return ``value`` if it is a ``str``, else raise :class:`TypeError`."""
+    """Return ``value`` as a plain ``str`` if it is a ``str``, else raise :class:`TypeError`.
+
+    A subclass (a string enum member, say) is read by its characters, never by its
+    own ``__str__``, ``__eq__`` or ``__format__``.
+    """
     if not isinstance(value, str):
         raise TypeError(f"{name} must be a str, not {type(value).__name__}")
+    return str.__str__(value)
+
+
+def check_bool(name: str, value: object) -> bool:
+    """Return ``value`` if it is a ``bool``, else raise :class:`TypeError`."""
+    if not isinstance(value, bool):
+        raise TypeError(f"{name} must be a bool, not {type(value).__name__}")
     return value
 
 
@@ -100,11 +117,11 @@ def check_integer(name: str, value: object) -> int:
 
 def validate_style(style: object) -> str:
     """Return ``style`` if it is a known style, else raise."""
-    check_text("style", style)
-    if style not in STYLES:
-        shown = repr(style) if len(str(style)) <= 40 else "that value"
+    text = check_text("style", style)
+    if text not in STYLES:
+        shown = repr(text) if len(text) <= 40 else "that value"
         raise ValueError(f"unknown style: {shown}; choose from {', '.join(STYLES)}")
-    return str(style)
+    return text
 
 
 def validate_base(base: object) -> int:
@@ -118,8 +135,7 @@ def validate_base(base: object) -> int:
 
 def validate_separator(decimal_sep: object) -> str:
     """Return ``decimal_sep`` if it is one safe character, else raise."""
-    check_text("decimal_sep", decimal_sep)
-    text = str(decimal_sep)
+    text = check_text("decimal_sep", decimal_sep)
     if len(text) != 1 or text.isdigit() or text.isspace():
         raise ValueError("decimal_sep must be a single non-digit, non-space character")
     if text.isalpha() or text in "+-":

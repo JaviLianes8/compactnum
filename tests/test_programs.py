@@ -13,7 +13,7 @@ from compactnum import format, parse
 
 ICU = json.loads((programs.FIXTURES / "icu-compact-en.json").read_text(encoding="utf-8"))
 NUMFMT = json.loads((programs.FIXTURES / "numfmt-iec.json").read_text(encoding="utf-8"))
-STYLE = {"short": "si", "long": "long"}
+STYLE = {"short": "short", "long": "long"}
 
 
 def _check_icu(cases: list[list[object]], outputs: list[str]) -> int:

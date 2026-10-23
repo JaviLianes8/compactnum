@@ -144,8 +144,8 @@ def test_results_ignore_the_callers_decimal_context_and_digit_limit() -> None:
 
 
 def test_numeric_types_are_read_as_documented() -> None:
-    assert format(Fraction(1, 3) * 3000) == "1k"  # type: ignore[arg-type]
-    assert format(Fraction(1, 8) * 10_000, precision=4) == "1.25k"  # type: ignore[arg-type]
+    assert format(Fraction(1, 3) * 3000) == "1k"
+    assert format(Fraction(1, 8) * 10_000, precision=4) == "1.25k"
 
     class Index(int):
         pass
