@@ -16,7 +16,7 @@ Progress:
 - [x] Gates (item 15)
 - [ ] Independent reviewer (item 16)
 - [ ] Five QA lenses (item 19)
-- [ ] PR, trace guard, merge and publish (item 17)
+- [ ] PR #3 from `release/1.0.0` opened and trace guard CLEAN; merge and publish pending (item 17)
 
 ## Scorecard (items 1 to 15 and 18)
 
