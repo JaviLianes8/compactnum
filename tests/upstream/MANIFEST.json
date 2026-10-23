@@ -1,0 +1,49 @@
+{
+  "bipm-si-prefixes.txt": {
+    "title": "BIPM, The International System of Units (SI): Prefixes (visible text of the page)",
+    "url": "https://www.bipm.org/en/measurement-units/si-prefixes",
+    "form": "text",
+    "revision": "live page; prefixes of CGPM 2022 Resolution 3",
+    "licence": "BIPM website terms, https://www.bipm.org/en/legal-notice",
+    "fetched": "2026-10-23",
+    "size": 7053,
+    "sha256": "010a4b1f20c8d5c4571742c61a4235c4cf0a91ac5348161273aef1fb1cb77522"
+  },
+  "nist-binary-prefixes.txt": {
+    "title": "NIST, Prefixes for binary multiples (visible text of the page)",
+    "url": "https://physics.nist.gov/cuu/Units/binary.html",
+    "form": "text",
+    "revision": "live page",
+    "licence": "NIST web content, https://www.nist.gov/oism/copyrights",
+    "fetched": "2026-10-23",
+    "size": 5642,
+    "sha256": "c2c723fdddf7a76799ea1e13fdd2c0138c6160a787c32b52008939526bd1b927"
+  },
+  "cldr-48-en-numbers.json": {
+    "title": "Unicode CLDR 48 English number data (cldr-json)",
+    "url": "https://raw.githubusercontent.com/unicode-org/cldr-json/48.0.0/cldr-json/cldr-numbers-full/main/en/numbers.json",
+    "revision": "tag 48.0.0",
+    "licence": "Unicode License v3, https://github.com/unicode-org/cldr-json/blob/48.0.0/LICENSE",
+    "fetched": "2026-10-23",
+    "size": 8089,
+    "sha256": "07a58e473f6d28dcc5d5562539d3ab5c8fbe37e435414969e3a2672525a80d5f"
+  },
+  "wikipedia-binary-prefix.wiki": {
+    "title": "Wikipedia, Binary prefix (wikitext)",
+    "url": "https://en.wikipedia.org/w/index.php?title=Binary_prefix&action=raw&oldid=1379766883",
+    "revision": "oldid 1379766883 (2026-10-11)",
+    "licence": "CC BY-SA 4.0, https://creativecommons.org/licenses/by-sa/4.0/",
+    "fetched": "2026-10-23",
+    "size": 91918,
+    "sha256": "2f04d170afa324354aafdab7678195eb708d7e72be2124773a57e7ec8c32d839"
+  },
+  "wikipedia-names-of-large-numbers.wiki": {
+    "title": "Wikipedia, Names of large numbers (wikitext)",
+    "url": "https://en.wikipedia.org/w/index.php?title=Names_of_large_numbers&action=raw&oldid=1378239340",
+    "revision": "oldid 1378239340 (2026-10-03)",
+    "licence": "CC BY-SA 4.0, https://creativecommons.org/licenses/by-sa/4.0/",
+    "fetched": "2026-10-23",
+    "size": 41132,
+    "sha256": "7af57f36e746e6315580114cf3d867033aeda2a77bc56f7b15f5a17328cd23b4"
+  }
+}

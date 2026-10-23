@@ -64,6 +64,15 @@ def test_missing_expected_unit_is_an_error() -> None:
         parse("1.5Ki", unit="B")
 
 
+def test_text_that_is_only_the_unit_has_no_number() -> None:
+    with pytest.raises(CompactError) as info:
+        parse("B", unit="B")
+    assert str(info.value) == "not compact notation: 'B'"
+    with pytest.raises(CompactError) as info:
+        parse_decimal(" kB ", unit="KB")
+    assert str(info.value) == "not compact notation: ' kB '"
+
+
 def test_custom_decimal_separator() -> None:
     assert parse("1,5k", decimal_sep=",") == 1500
     with pytest.raises(CompactError):
@@ -85,10 +94,47 @@ def test_rejects_invalid_notation(bad: str) -> None:
 
 
 def test_rejects_non_strings() -> None:
-    with pytest.raises(CompactError):
+    with pytest.raises(TypeError):
         parse(1200)  # type: ignore[arg-type]
 
 
 def test_rejects_bad_decimal_separator() -> None:
     with pytest.raises(ValueError):
         parse("1.2k", decimal_sep="99")
+
+
+def test_messages_quote_at_most_forty_characters() -> None:
+    with pytest.raises(CompactError) as info:
+        parse("x" * 40)
+    assert str(info.value) == f"not compact notation: {'x' * 40!r}"
+    with pytest.raises(CompactError) as info:
+        parse("x" * 41)
+    assert str(info.value) == f"not compact notation: {'x' * 40!r}... (41 characters)"
+    with pytest.raises(CompactError) as info:
+        parse("1" + "q" * 500)
+    assert str(info.value) == f"unknown suffix: {'q' * 40!r}... (500 characters)"
+    with pytest.raises(CompactError) as info:
+        parse("1k", unit="B" * 50)
+    assert len(str(info.value)) < 120
+
+
+def test_digit_limit_counts_digits_on_both_sides_of_the_point() -> None:
+    whole, fraction = "9" * 4300, "9" * 4300
+    assert parse_decimal(whole + "." + fraction) == Decimal(whole + "." + fraction)
+    with pytest.raises(CompactError, match="more than 8600 digits"):
+        parse_decimal(whole + "." + fraction + "9")
+
+
+def test_explicit_plus_sign_and_ascii_digits_only() -> None:
+    assert parse_decimal("+1.5k") == Decimal(1500)
+    odd = [chr(0x661) + chr(0x662) + "k", chr(0xFF11) + "k", "1" + chr(0xB2) + "k"]
+    for text in [*odd, "++1k", "+-1k"]:
+        with pytest.raises(CompactError):
+            parse(text)
+
+
+def test_parse_refuses_a_fraction_too_large_for_a_float() -> None:
+    with pytest.raises(CompactError, match="too large for a float"):
+        parse("1" * 300 + ".3Yi")
+    assert parse_decimal("1" * 300 + ".3Yi") > 10**320
+    assert parse("1" * 300 + ".5Yi") == int("1" * 300) * 2**80 + 2**79
