@@ -98,6 +98,8 @@ def test_numpy_values_follow_the_annotation() -> None:
     np: Any = _numpy()
     assert format(np.array(1500.0)) == "1.5k"  # a 0-d array has __float__
     assert format(np.int64(-1200)) == "-1.2k" and format(np.float32(1.5)) == "1.5"
+    assert format(np.uint64(1536), base=1024) == "1.5Ki"
+    assert format(np.array(-1200)) == "-1.2k" and format(np.array(1200, np.uint16)) == "1.2k"
     with pytest.raises(TypeError, match=r"value must be a real number, not numpy\.ndarray$"):
         format(np.array([1500.0, 2.0]))
     with pytest.raises(TypeError, match=r"value must be a real number, not numpy\.bool_?$"):
