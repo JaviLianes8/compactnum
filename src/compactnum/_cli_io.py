@@ -63,8 +63,7 @@ def write(stream_name: str, text: str) -> bool:
         write("stderr", f"compactnum: error: the result cannot be written as {name}; {hint}\n")
         return False
     except (AttributeError, OSError, ValueError):
-        _silence(stream)
-        return False
+        return False  # finish() silences the stream when it flushes it
     return True
 
 
