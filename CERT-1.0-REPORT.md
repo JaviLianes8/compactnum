@@ -15,7 +15,8 @@ Progress:
 - [x] Packaging, wheel e2e, every Python on this PC (items 8, 10, 13, 14)
 - [x] Gates (item 15)
 - [ ] Independent reviewer (item 16)
-- [ ] Five QA lenses (item 19): round 1 reported 17 findings, all fixed at 1a86ea1; re-verification by the lenses pending
+- [ ] Five QA lenses (item 19): round 1 reported 17 findings, all fixed at 1a86ea1; round 2
+  re-verified them and reported 9 new ones, all fixed at 7da7243; re-verification pending
 - [ ] PR #3 from `release/1.0.0` opened and trace guard CLEAN; merge and publish pending (item 17)
 
 ## Scorecard (items 1 to 15 and 18)
@@ -64,7 +65,9 @@ values exactly, exits 2 on usage errors with bounded messages, survives a closed
 reports unencodable output. QA round 1 changed three things: `value` is annotated
 `SupportsFloat | SupportsIndex` (every documented value type passes `mypy --strict`), the
 default style is named `"short"` (`"si"` stays as its 0.x name: it never wrote SI
-prefixes), and `trim_zeros` must be a `bool`.
+prefixes), and `trim_zeros` must be a `bool`. QA round 2 made the runtime read every value
+the annotation accepts (objects with only `__index__` or only `__float__`), named foreign
+types by module in `TypeError` messages, and let the command read `-inf` and `-nan`.
 
 ## Ground truth (item 7)
 
@@ -242,6 +245,49 @@ documents, Node.js and GNU numfmt present: `ruff format --check .`, `ruff check 
 skipped) each exit 0. With `COMPACTNUM_E2E=1`: 261 passed, no skips, on CPython 3.10.19,
 3.11.5, 3.12.12, 3.13.2, 3.14.2 and 3.14.2 free-threaded.
 
+### Round 2 (reviewed at 0848be4, fixed at 7da7243)
+
+Lenses a, d and e re-ran every round-1 finding: all fixed (lens e replayed each as a
+mutant, all killed). Lens a ran 37 Python probes and 14 CLI calls on 3.11 and 3.13, lens d
+the sdist suite against the wheel on six interpreters (247 passed, 9 upstream skips each)
+and 40 probes, lens e 40 new mutants. New findings, all fixed; none is disputed:
+
+| Lens | Id | Severity | Finding | Fix |
+| --- | --- | --- | --- | --- |
+| a | N1 | medium | the annotation `SupportsFloat \| SupportsIndex` accepted objects with only `__index__` or only `__float__` (and NumPy arrays) that raised `TypeError` at run time | `format` reads such an object exactly through `operator.index`, or through `float()`; `bool` and NumPy booleans still refused, a refusing `__float__` is a `TypeError`; new module `_value.py`; `tests/test_value_types.py`, and `tests/test_typing.py` runs the typed consumer with those objects |
+| a | N2 | low | `trim_zeros must be a bool, not bool` for a NumPy boolean | every `TypeError` names a type outside the builtins as `module.qualname` (`numpy.bool`), cut at 80 characters |
+| d | F2 | low | `format -inf` (and `-Infinity`, `-nan`, `-sNaN`) was a usage error, against the "minus sign on every Python" promise | the negative-value rule also matches those whole words, so they exit 1 as not finite; any other dash and letter stays an option |
+| e | E9 | low | no test of the `invalid integer value` wording for `--precision` | pinned |
+| e | E10 | low | no test of the `--precision` range message | pinned for -1 and 4301 |
+| e | E11 | low | no test of a separator whose `__ne__` lies | `Liar` separator in `tests/test_text_types.py` |
+| e | E12 | low | no test that `parse` and `parse_decimal` read `text` by its characters and keep the message bounded | `Liar` text with lying `strip`, `replace` and `__repr__` |
+| e | E13 | low | no test that a dash and a letter stays an option | `parse -k`, `format -nancy`, `--unit -B` and others must exit 2 |
+
+Contract tests first: against 0848be4 the new tests failed 13 times (N1, N2 and F2); the
+lens e tests passed there, as they pin existing behaviour. Each lens e mutant and six
+more for the new code were applied alone to a copy of 7da7243 and run on CPython 3.13.2
+with the affected test files; all killed:
+
+| Id | Mutation | Caught by |
+| --- | --- | --- |
+| E9 | `_precision.__name__` not set | `tests/test_cli_options.py::test_precision_usage_errors_say_what_is_wrong` |
+| E10 | `ValueError` for the precision range | `tests/test_cli_options.py::test_precision_usage_errors_say_what_is_wrong` |
+| E11 | separator returned as the caller's object | `tests/test_text_types.py::test_a_separator_whose_comparisons_lie_is_read_by_its_characters` |
+| E12 | checked text not assigned | `tests/test_text_types.py::test_text_whose_methods_lie_is_read_by_its_characters` |
+| E13 | negative-value rule `-\.?\w` | `tests/test_cli_options.py::test_a_dash_and_text_that_is_no_number_stays_an_option` |
+| R18 | negative-value rule back to `-\.?\d` | `tests/test_cli_options.py::test_negative_infinities_and_nans_are_values_rejected_as_not_finite` |
+| R19 | protocol-only values refused | `tests/test_value_types.py::test_an_index_only_object_is_read_exactly` |
+| R20 | `__index__` read through `float()` | `tests/test_value_types.py::test_an_index_only_object_is_read_exactly` |
+| R21 | type names without their module | `tests/test_value_types.py::test_numpy_values_follow_the_annotation` |
+| R22 | NumPy booleans accepted | `tests/test_value_types.py::test_numpy_values_follow_the_annotation` |
+| R23 | huge type names not cut | `tests/test_value_types.py::test_a_huge_type_name_is_cut_in_the_message` |
+
+Gates at 7da7243 on Elena's PC (CPython 3.14.2, NumPy 2.5.4, a clone of the branch):
+`ruff format --check .`, `ruff check .`, `mypy --strict src`, `mypy --strict src tests`
+and `pytest` with `COMPACTNUM_E2E=1` (279 passed, 8 skipped: the fetched documents and
+GNU numfmt are not on that PC) each exit 0. The changed CLI, value and text test files
+also pass on CPython 3.11.5 and 3.13.2 on this PC.
+
 ### Disputed findings
 
-None in round 1.
+None in rounds 1 and 2.
