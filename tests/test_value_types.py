@@ -162,6 +162,7 @@ def test_numpy_values_that_hold_no_real_number_are_refused() -> None:
         np.array("1200"),
         np.array(b"1200"),
         np.array(np.timedelta64(5, "s")),
+        np.array(np.datetime64(1500, "ns")),
         np.array(Decimal(5), dtype=object),
         np.array(np.void(b"12")),
     ):
@@ -170,6 +171,8 @@ def test_numpy_values_that_hold_no_real_number_are_refused() -> None:
     for value, name in (
         (np.str_("1200"), "str_"),
         (np.timedelta64(5, "s"), "timedelta64"),
+        # A fine unit such as ns converts to float, so only the data type check refuses it.
+        (np.datetime64(1500, "ns"), "datetime64"),
         (np.void(b"12"), "void"),
     ):
         with pytest.raises(TypeError, match=rf"^value must be a real number, not numpy\.{name}$"):
