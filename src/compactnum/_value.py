@@ -16,7 +16,7 @@ def coerce(value: object) -> Decimal:
     """Return ``value`` as a ``Decimal``, reading integers exactly and floats by ``repr``."""
     if isinstance(value, Decimal):
         number = value
-    elif _is_boolean(value):
+    elif _is_refused(value):
         raise TypeError(f"value must be a real number, not {type_name(value)}")
     elif isinstance(value, numbers.Integral):
         number = _integer(int(value))
@@ -37,12 +37,18 @@ def coerce(value: object) -> Decimal:
     return number
 
 
-def _is_boolean(value: object) -> bool:
-    # A NumPy boolean is no numbers.Real but has __float__; it is refused like bool.
+def _is_refused(value: object) -> bool:
+    # These all have __float__ (NumPy gives it to every scalar and array) yet hold no
+    # real number: a boolean, a complex number, text, a NumPy timedelta or object array.
     kind = type(value)
-    return isinstance(value, bool) or (
-        kind.__module__ == "numpy" and kind.__name__ in ("bool", "bool_")
-    )
+    if isinstance(value, (bool, str, bytes, bytearray)):
+        return True
+    if kind.__module__ == "numpy" and kind.__name__ in ("bool", "bool_"):
+        return True
+    if isinstance(value, numbers.Complex) and not isinstance(value, numbers.Real):
+        return True
+    dtype_kind = getattr(getattr(value, "dtype", None), "kind", None)
+    return isinstance(dtype_kind, str) and dtype_kind not in ("i", "u", "f")
 
 
 def _integer(integer: int) -> Decimal:

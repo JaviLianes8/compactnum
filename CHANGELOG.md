@@ -39,9 +39,15 @@ repository, and the changes below are measured against 0.2.0.
   type checkers accept the `Decimal`, `Fraction` and NumPy values it reads, and it reads
   every value the annotation accepts: an object with only `__index__` exactly, one with
   only `__float__` (a 0-d NumPy array) through `float()`. 0.2.0 raised
-  `decimal.InvalidOperation` for both. NumPy booleans are refused like `bool`.
+  `decimal.InvalidOperation` for both. NumPy booleans and complex numbers are refused
+  like `bool` and `complex`, and so is a NumPy scalar or array whose data type is not
+  an integer or float type (`np.array(True)`, a string or timedelta array), although
+  NumPy gives each of them `__float__`. A value read through `float()` that is too
+  large for one (`Fraction(10**400)`) raises `ValueError`, where 0.2.0 raised
+  `decimal.InvalidOperation`.
 - A `TypeError` message names a type outside the builtins by module and name
-  (`trim_zeros must be a bool, not numpy.bool`), cut at 80 characters.
+  (`trim_zeros must be a bool, not numpy.bool`); a longer name than 80 characters is cut
+  to its first 80 and `...`.
 - `format` computes with exact decimal arithmetic whatever the size of the value. In
   0.2.0 it used the caller's `decimal` context (28 digits by default), so
   `format(123456789012345678901234567890123, precision=3)` printed `123456789.012Sp`, and

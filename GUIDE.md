@@ -15,10 +15,12 @@ mantissa to `precision` decimals and writes the suffix.
   through `float()`. `value` is annotated `SupportsFloat | SupportsIndex`, and the
   runtime reads what the annotation accepts: any other object with `__index__` is read
   exactly through it, and one with only `__float__` (a 0-d NumPy array, say) through
-  `float()`. `bool`, NumPy booleans, strings, `None`, complex numbers and objects whose
-  `__float__` refuses (a NumPy array of several elements) raise `TypeError`, which
-  names a type outside the builtins by module, as in `numpy.bool`. Infinities, NaNs
-  and values with more than 4300 integer digits raise `ValueError`.
+  `float()`. Booleans, complex numbers and text, `None`, NumPy scalars and arrays whose
+  data type is not an integer or float type (`np.array(True)`, `np.complex128(1)`) and
+  objects whose `__float__` refuses (a NumPy array of several elements) raise
+  `TypeError`, which names a type outside the builtins by module, as in `numpy.bool`.
+  Infinities, NaNs, values with more than 4300 integer digits and a value read through
+  `float()` that is too large for one (`Fraction(10**400)`) raise `ValueError`.
 - **Rounding** is half-up: ties go away from zero. It works on the exact decimal value,
   so the result never depends on binary floating point or on the caller's `decimal`
   context.
@@ -165,8 +167,10 @@ decimal (scientific notation allowed). `compactnum parse TEXT` takes `--unit`,
 nearest float, or the exact decimal with `--exact`. A value may start with a minus sign
 (`compactnum format -1e3`, `compactnum parse -1.2k`) on every supported Python; `--`
 before it (`compactnum parse -- -1.2k`) works too. That covers `-inf` and `-nan`, which
-`format` rejects as not finite (exit 1). A dash followed by anything else, such as
-`-k` or `--unit -B`, is read as an option, so it is a usage error unless `--` comes first.
+`format` rejects as not finite (exit 1). Any other value that starts with a dash, such
+as `-k`, is read as an option, so it is a usage error unless `--` comes before it
+(`compactnum parse -- -k`). An option's value that starts with a dash is joined to it
+with `=`, as in `compactnum parse 1k-B --unit=-B`; `--` does not help there.
 
 Exit codes: 0 done; 1 the value was rejected, or the output could not be written (a
 closed pipe, or a unit the output encoding cannot hold); 2 bad usage, including an

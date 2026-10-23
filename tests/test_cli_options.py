@@ -122,6 +122,29 @@ def test_a_dash_and_text_that_is_no_number_stays_an_option(
     assert (code, out) == (2, "") and "usage:" in err
 
 
+@pytest.mark.parametrize("word", ["-information", "-nancy", "-infk", "-nanB", "-k"])
+@pytest.mark.parametrize(("command", "argument"), [("parse", "text"), ("format", "value")])
+def test_a_dash_and_a_word_is_an_option_so_the_value_is_missing(
+    capsys: pytest.CaptureFixture[str], command: str, argument: str, word: str
+) -> None:
+    code, out, err = _run(capsys, command, word)
+    assert (code, out) == (2, "")
+    assert err.rstrip().endswith(f"the following arguments are required: {argument}"), err
+
+
+def test_an_option_value_that_starts_with_a_dash_takes_an_equals_sign() -> None:
+    env = {**os.environ, "PYTHONPATH": str(SRC)}
+    for args, expected in (
+        (["parse", "1k-B", "--unit=-B"], b"1000"),
+        (["format", "5", "--unit=-B"], b"5-B"),
+        (["parse", "--unit=-B", "--", "-1k-B"], b"-1000"),
+    ):
+        done = subprocess.run(
+            [sys.executable, "-m", "compactnum", *args], capture_output=True, env=env, timeout=60
+        )
+        assert (done.returncode, done.stdout.strip(), done.stderr) == (0, expected, b"")
+
+
 def test_option_values_at_their_limits_are_accepted(capsys: pytest.CaptureFixture[str]) -> None:
     code, out, _ = _run(capsys, "format", "1200", "--precision", "4300", "--no-trim")
     assert (code, out) == (0, "1.2" + "0" * 4299 + "k\n")

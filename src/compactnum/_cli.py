@@ -26,7 +26,7 @@ _EXAMPLES = """examples:
   compactnum parse -1.2k                        ->  -1200
 
 A value may start with a minus sign (-inf and -nan included) on every Python version;
--- before it works too.
+-- before it works too. An option value that starts with a dash takes =, as in --unit=-B.
 Exit codes: 0 done, 1 the value was rejected (or the output could not be written),
 2 bad usage (an invalid option value included).
 """

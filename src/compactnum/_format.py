@@ -71,11 +71,13 @@ def format(
         Values past the largest suffix keep that suffix with a bigger mantissa.
 
     Raises:
-        TypeError: If ``value`` is not a real number (``bool`` and NumPy
-            booleans included) or its ``__float__`` refuses, an
+        TypeError: If ``value`` is not a real number (booleans, complex
+            numbers, text and NumPy arrays of them included) or its
+            ``__float__`` refuses, an
             integer argument is not an integer, ``trim_zeros`` is not a ``bool``,
             or a text argument is not a ``str``.
-        ValueError: If ``value`` is not finite or too large, ``precision`` is
+        ValueError: If ``value`` is not finite or too large (for a ``float``
+            too, when read through ``float()``), ``precision`` is
             out of range, or ``style``, ``base`` or ``decimal_sep`` is invalid.
 
     Examples:
