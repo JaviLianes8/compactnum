@@ -136,3 +136,9 @@ def test_value_limits_are_exact() -> None:
     with pytest.raises(ValueError):
         format(Decimal("1e4300"))
     assert format(Decimal("9.99e4299"), precision=0) == "999" + "0" * 4267 + "No"
+
+
+def test_text_options_must_be_strings() -> None:
+    for options in ({"unit": 5}, {"unit": None}, {"style": b"si"}, {"decimal_sep": 44}):
+        with pytest.raises(TypeError):
+            format(1200, **options)

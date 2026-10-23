@@ -46,6 +46,7 @@ def _run(capsys: pytest.CaptureFixture[str], *args: str) -> tuple[int, str, str]
         (["parse", "--", "-1.2k"], "-1200"),
         (["parse", "9" * 4300 + "Yi"], f"{decimal.Context(prec=5000).multiply(NINES, 2**80):f}"),
     ],
+    ids=lambda item: str(item)[:30],
 )
 def test_prints_the_result_and_exits_zero(
     capsys: pytest.CaptureFixture[str], args: list[str], expected: str

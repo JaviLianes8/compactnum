@@ -47,23 +47,13 @@ def finish(code: int) -> int:
     return code
 
 
-def _encodable(stream: object, text: str) -> str:
-    encoding = getattr(stream, "encoding", None) or "utf-8"
-    try:
-        return text.encode(encoding, "backslashreplace").decode(encoding)
-    except LookupError:
-        return text
-
-
 def write(stream_name: str, text: str) -> bool:
     """Write ``text`` to stdout or stderr; return False when it could not be written.
 
-    Text that stderr's encoding cannot hold is escaped. Text that stdout cannot hold is
-    reported on stderr instead, so a result is never silently changed.
+    Python's stderr escapes what its encoding cannot hold. Text that stdout cannot hold
+    is reported on stderr instead, so a result is never silently changed.
     """
     stream = sys.stdout if stream_name == "stdout" else sys.stderr
-    if stream_name != "stdout":
-        text = _encodable(stream, text)
     try:
         stream.write(text)
         stream.flush()

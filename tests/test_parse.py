@@ -124,3 +124,10 @@ def test_explicit_plus_sign_and_ascii_digits_only() -> None:
     for text in [*odd, "++1k", "+-1k"]:
         with pytest.raises(CompactError):
             parse(text)
+
+
+def test_parse_refuses_a_fraction_too_large_for_a_float() -> None:
+    with pytest.raises(CompactError, match="too large for a float"):
+        parse("1" * 300 + ".3Yi")
+    assert parse_decimal("1" * 300 + ".3Yi") > 10**320
+    assert parse("1" * 300 + ".5Yi") == int("1" * 300) * 2**80 + 2**79
