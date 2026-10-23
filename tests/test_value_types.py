@@ -156,6 +156,9 @@ def test_numpy_values_that_hold_no_real_number_are_refused() -> None:
         np.array(True),
         np.array(False),
         np.array(1500 + 0j),
+        # NumPy refuses float() of most complex arrays itself, but this one converts
+        # with only a warning, so the data type check is what refuses it.
+        np.array(1500 + 0j, dtype=np.clongdouble),
         np.array("1200"),
         np.array(b"1200"),
         np.array(np.timedelta64(5, "s")),

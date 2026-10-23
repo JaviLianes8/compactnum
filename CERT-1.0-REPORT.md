@@ -19,7 +19,8 @@ Progress:
   re-verified them and reported 9 new ones, all fixed at 7da7243; round 3 re-verified those
   and reported 9 new ones, all fixed at 0a74dcf; round 4 re-verified those and reported 6
   new ones (one found by two lenses), all fixed at ca77018; round 5 re-verified those and
-  reported 3 new ones, all fixed in the round 5 commit; re-verification pending
+  reported 3 new ones, all fixed at d56401b; round 6 re-verified those and reported 1 new
+  one, fixed in the round 6 commit; re-verification pending
 - [ ] PR #3 from `release/1.0.0` opened and trace guard CLEAN; merge and publish pending (item 17)
 
 ## Scorecard (items 1 to 15 and 18)
@@ -392,7 +393,7 @@ Gates at ca77018: `ruff format --check .`, `ruff check .`, `mypy --strict src` a
 and so does `pytest` with `COMPACTNUM_E2E=1` (8 skipped: the fetched documents and GNU
 numfmt are not on that PC).
 
-### Round 5 (reviewed at 3eb194d)
+### Round 5 (reviewed at 3eb194d, fixed at d56401b)
 
 Lens a re-ran N5 on CPython 3.11.5 and 3.13.2 (fixed: `--unit=--` reads as the unit, the
 other options exit 2 naming themselves, no traceback), ran 40 probes (34 CLI probes on
@@ -424,6 +425,36 @@ On Elena's PC (CPython 3.14.2, NumPy 2.5.4, a clone of the branch) `pytest` exit
 and so does `pytest` with `COMPACTNUM_E2E=1` (8 skipped: the fetched documents and GNU
 numfmt are not on that PC).
 
+### Round 6 (reviewed at d56401b)
+
+Lens e re-ran both round-5 findings: fixed. `parse -- --` exits 1 with
+`not compact notation: '--'` and `format -- --` exits 2 with `invalid number value: '--'`;
+`StringDType` arrays holding `1200` or `abc` are refused; G13, V04 and V05 are killed on
+CPython 3.11.5 and 3.14.6. The only change to `src` since 3eb194d is a comment, so the lens
+swept `Parser._get_values` and `_value._is_refused` with 10 new mutants: 6 killed, 1 killed
+only on 3.11.5 (on 3.13 and 3.14 argparse already reads `--` as text), 2 equivalent (an
+87-case CLI differential of exit code, stdout and stderr showed no difference on 3.11.5,
+3.13.2 and 3.14.6, since every option has `nargs` None or 0) and 1 survivor. New finding,
+fixed; none is disputed:
+
+| Lens | Id | Severity | Finding | Fix |
+| --- | --- | --- | --- | --- |
+| e | E27 (S07) | low | no test used a NumPy complex array whose `float()` works, so `c` added to the allowed data type kinds survived: NumPy itself refuses `float()` of `np.array(1500 + 0j)`, but a `clongdouble` array converts with only a `ComplexWarning`, and the mutant formatted it as `1.5k` | `np.array(1500 + 0j, dtype=np.clongdouble)` must be refused, naming `numpy.ndarray` |
+
+No behaviour changed in this round: the new case pins what the code already did. S07 was
+applied alone to a copy of the tree and `tests/test_value_types.py` run on this PC: on
+CPython 3.13.2 with NumPy 2.3.5 and on CPython 3.11.5 with NumPy 1.26.4 the test fails
+under the mutant and passes on the unmutated code; without the new case it passed under
+the mutant.
+
+| Id | Mutation | Caught by |
+| --- | --- | --- |
+| S07 | `c` added to the allowed data type kinds | `tests/test_value_types.py::test_numpy_values_that_hold_no_real_number_are_refused` |
+
+Gates: `ruff format --check .`, `ruff check .` and `mypy --strict src tests` exit 0 on
+this PC (CPython 3.13.2). On Elena's PC (CPython 3.14.2, NumPy 2.5.4, a clone of the
+branch) `pytest` exits 0 (315 passed, 10 skipped).
+
 ### Disputed findings
 
-None in rounds 1 to 5.
+None in rounds 1 to 6.
