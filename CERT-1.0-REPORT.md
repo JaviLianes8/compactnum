@@ -20,7 +20,8 @@ Progress:
   and reported 9 new ones, all fixed at 0a74dcf; round 4 re-verified those and reported 6
   new ones (one found by two lenses), all fixed at ca77018; round 5 re-verified those and
   reported 3 new ones, all fixed at d56401b; round 6 re-verified those and reported 1 new
-  one, fixed in the round 6 commit; re-verification pending
+  one, fixed at 59e2a1c; round 7 re-verified it and reported 1 new one, fixed at 41a9cd2;
+  re-verification pending
 - [ ] PR #3 from `release/1.0.0` opened and trace guard CLEAN; merge and publish pending (item 17)
 
 ## Scorecard (items 1 to 15 and 18)
@@ -425,7 +426,7 @@ On Elena's PC (CPython 3.14.2, NumPy 2.5.4, a clone of the branch) `pytest` exit
 and so does `pytest` with `COMPACTNUM_E2E=1` (8 skipped: the fetched documents and GNU
 numfmt are not on that PC).
 
-### Round 6 (reviewed at d56401b)
+### Round 6 (reviewed at d56401b, fixed at 59e2a1c)
 
 Lens e re-ran both round-5 findings: fixed. `parse -- --` exits 1 with
 `not compact notation: '--'` and `format -- --` exits 2 with `invalid number value: '--'`;
@@ -455,6 +456,34 @@ Gates: `ruff format --check .`, `ruff check .` and `mypy --strict src tests` exi
 this PC (CPython 3.13.2). On Elena's PC (CPython 3.14.2, NumPy 2.5.4, a clone of the
 branch) `pytest` exits 0 (315 passed, 10 skipped).
 
+### Round 7 (reviewed at 59e2a1c, fixed at 41a9cd2)
+
+Lens e re-ran the round-6 finding: fixed. S07 is killed by
+`tests/test_value_types.py::test_numpy_values_that_hold_no_real_number_are_refused` on
+CPython 3.11.5, 3.13.2 and 3.14.2. The lens swept `_value._is_refused` and
+`_get_values` with 9 new mutants: 8 killed (dropping the complex check, allowing the
+kinds `b`, `O`, `V`, `U` or `S`, dropping the `bool_` name, `_get_values` returning
+`[value]`) and 1 survivor. New finding, fixed; none is disputed:
+
+| Lens | Id | Severity | Finding | Fix |
+| --- | --- | --- | --- | --- |
+| e | E28 (R07) | low | no test used a NumPy `datetime64` value, so `M` added to the allowed data type kinds survived: NumPy refuses `float()` of coarse units such as `s` and `D`, but a fine unit such as `ns` converts, and the mutant formatted `np.datetime64(1500, "ns")` as `1.5k` | `np.datetime64(1500, "ns")` must be refused naming `numpy.datetime64`, and `np.array(np.datetime64(1500, "ns"))` naming `numpy.ndarray` |
+
+No behaviour changed in this round: the new cases pin what the code already did (GUIDE.md
+promises a `TypeError` for NumPy values whose data type is not an integer or float type).
+R07 was applied alone to a copy of the tree and `tests/test_value_types.py` run: the test
+fails under the mutant and passes on the unmutated code on CPython 3.13.2 with NumPy 2.3.5
+and on CPython 3.11.5 with NumPy 1.26.4 (this PC), and fails under the mutant on CPython
+3.14.2 with NumPy 2.5.4 (Elena's PC).
+
+| Id | Mutation | Caught by |
+| --- | --- | --- |
+| R07 | `M` added to the allowed data type kinds | `tests/test_value_types.py::test_numpy_values_that_hold_no_real_number_are_refused` |
+
+Gates: `ruff format --check .`, `ruff check .` and `mypy --strict src tests` exit 0 on
+this PC (CPython 3.13.2). On Elena's PC (CPython 3.14.2, NumPy 2.5.4, a clone of 41a9cd2)
+`pytest` exits 0 (315 passed, 10 skipped).
+
 ### Disputed findings
 
-None in rounds 1 to 6.
+None in rounds 1 to 7.
