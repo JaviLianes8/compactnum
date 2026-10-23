@@ -34,11 +34,11 @@ Progress:
 | 3 | Docstrings with runnable examples | PASS: every public name and the package have `>>>` examples, run by `--doctest-modules`; README (10 outputs) and GUIDE (15 outputs) examples and the README command transcript run as tests |
 | 4 | Typed end to end | PASS: `mypy --strict src tests` clean, `py.typed` shipped, `typing.get_type_hints` resolves on every function |
 | 5 | Typed, documented, safe errors | PASS: `CompactError` (a `ValueError`) for bad text, `TypeError` for wrong types, `ValueError` for bad options; messages quote at most 40 characters (CLI: 300); GUIDE error table |
-| 6 | Contract of every public name | PASS: 189 tests and 5 doctests, plus the 2 opt-in wheel tests (196 in all) |
+| 6 | Contract of every public name | PASS: 322 tests and 5 doctests, the 2 opt-in wheel tests among them (327 in all at a823a59) |
 | 7 | Real ground truth | PASS: five fetched documents with a hash manifest; 3,000 ICU 78.3 and 3,000 GNU numfmt 8.32 outputs captured and compared, plus live runs |
 | 8 | Real e2e from the wheel | PASS: wheel installed in a fresh venv, used from an empty folder with `-I`, console script and `python -m` by subprocess; no PyPI release to upgrade from |
 | 9 | Seeded fuzz | PASS: 51,000 seeded oracle cases and 66,000 hostile calls per run, timing linear |
-| 10 | Supported Pythons | PASS: CPython 3.10.19, 3.11.5, 3.12.12, 3.13.2, 3.14.2 and 3.14.2t, the sdist suite against the installed wheel, 191 passed each |
+| 10 | Supported Pythons | PASS: the sdist suite against the installed wheel on CPython 3.10.19, 3.11.5, 3.12.12, 3.13.2, 3.14.2 and 3.14.2t on this PC (311 passed, 7 upstream skips each, at 3eb194d) and on 3.10.22, 3.11.17, 3.12.15, 3.13.17, 3.14.9 and 3.14.9t (319 passed, 3 skipped each, at 0fd443c) |
 | 11 | README, `twine check` | PASS: `twine check --strict` PASSED for wheel and sdist; absolute links tested; certified badge |
 | 12 | Dated CHANGELOG | PASS: `## [1.0.0] - 2026-10-22` |
 | 13 | pyproject | PASS: 1.0.0, Production/Stable, Python 3.10 to 3.14 classifiers, MIT, Homepage/Source/Issues/Changelog, keywords, `dependencies = []` (tested) |
@@ -206,6 +206,19 @@ Node.js and GNU numfmt present, each command alone: `ruff format --check .`,
 `ruff check .`, `mypy --strict src`, `mypy --strict src tests` and `pytest` with
 `COMPACTNUM_E2E=1` (196 passed, no skips) all exit 0; `twine check --strict` PASSED for
 the wheel and the sdist built from that clone.
+
+Final run at a823a59 (the release code; later commits change only this report), from a
+fresh clone of `release/1.0.0` on Elena's PC (CPython 3.14.2, NumPy 2.5.4, the fetched
+documents present, every hash matching the manifest), each command alone:
+`ruff format --check .` (37 files), `ruff check .`, `mypy --strict src` (9 files),
+`mypy --strict src tests` (30 files) and `pytest` (324 passed, 3 skipped: the 2 opt-in
+wheel tests and GNU numfmt) all exit 0. `python -m build` exits 0 and
+`twine check --strict` PASSED for both files, byte for byte the files of the second
+review (wheel sha256 c5a01a51d5cf795e7e125537814fbd8063904e770a6751fe774879d72e804ec2,
+sdist sha256 24a881a582db5c27999fc3b0c630abf6bd063b4ba668280ee66267d5d7d2dfd5). The
+wheel, installed in a throwaway venv, ran the sdist's suite with `src` removed and
+`COMPACTNUM_E2E=1`: `compactnum` imported from the venv's `site-packages` at version
+1.0.0, 321 passed, 1 skipped (GNU numfmt).
 
 ## QA lenses (item 19)
 
