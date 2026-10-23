@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import enum
 import time
+from typing import SupportsIndex
 
 import pytest
 
@@ -54,6 +55,44 @@ def test_str_subclasses_with_their_own_str_and_eq_are_read_by_value() -> None:
     assert type(format(1500, unit=Loud("B"))) is str
     with pytest.raises(ValueError, match="unknown style"):
         format(1500, style=Loud("fancy"))
+
+
+class Liar(str):
+    """A str subclass whose comparisons, methods and repr all lie about its characters."""
+
+    def __eq__(self, other: object) -> bool:
+        return False
+
+    def __ne__(self, other: object) -> bool:
+        return False
+
+    __hash__ = str.__hash__
+
+    def strip(self, chars: str | None = None, /) -> str:
+        return "1k"
+
+    def replace(self, old: str, new: str, count: SupportsIndex = -1, /) -> str:
+        return "9"
+
+    def __repr__(self) -> str:
+        return "x" * 100_000
+
+
+def test_a_separator_whose_comparisons_lie_is_read_by_its_characters() -> None:
+    assert format(1500, decimal_sep=Liar(",")) == "1,5k"
+    assert parse_decimal("1,5k", decimal_sep=Liar(",")) == 1500
+    assert parse("1,5k", decimal_sep=Liar(",")) == 1500
+
+
+def test_text_whose_methods_lie_is_read_by_its_characters() -> None:
+    for reader in (parse, parse_decimal):
+        assert reader(Liar(" 2.5k ")) == 2500
+        with pytest.raises(CompactError) as info:
+            reader(Liar("junk"))
+        assert len(str(info.value)) < 80 and "xxx" not in str(info.value)
+        with pytest.raises(CompactError) as info:
+            reader(Liar("junk" * 1000))
+        assert len(str(info.value)) < 120 and "xxx" not in str(info.value)
 
 
 @pytest.mark.parametrize("flag", ["False", "", None, 0, 1, 1.0])

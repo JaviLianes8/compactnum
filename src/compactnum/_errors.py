@@ -31,3 +31,18 @@ def excerpt(text: str) -> str:
     if len(text) <= EXCERPT:
         return repr(text)
     return f"{text[:EXCERPT]!r}... ({len(text)} characters)"
+
+
+def type_name(value: object) -> str:
+    """Name the type of ``value`` for a message: ``int`` for a builtin, else ``module.qualname``.
+
+    A NumPy boolean is named ``numpy.bool``, never a bare ``bool``; a huge name is cut.
+    """
+    kind = type(value)
+    module = getattr(kind, "__module__", None)
+    name = kind.__qualname__
+    if isinstance(module, str) and module != "builtins":
+        name = f"{module}.{name}"
+    if len(name) > 2 * EXCERPT:
+        return name[: 2 * EXCERPT] + "..."
+    return name

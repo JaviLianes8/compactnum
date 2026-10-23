@@ -36,7 +36,12 @@ repository, and the changes below are measured against 0.2.0.
   means the same short-scale letters (`1.5B`); the SI prefixes (`1.5G`) are
   `style="metric"`, as before. The command's `--style` default is `short` too.
 - `format`'s `value` is annotated `SupportsFloat | SupportsIndex` (it was `float`), so
-  type checkers accept the `Decimal`, `Fraction` and NumPy values it reads.
+  type checkers accept the `Decimal`, `Fraction` and NumPy values it reads, and it reads
+  every value the annotation accepts: an object with only `__index__` exactly, one with
+  only `__float__` (a 0-d NumPy array) through `float()`. 0.2.0 raised
+  `decimal.InvalidOperation` for both. NumPy booleans are refused like `bool`.
+- A `TypeError` message names a type outside the builtins by module and name
+  (`trim_zeros must be a bool, not numpy.bool`), cut at 80 characters.
 - `format` computes with exact decimal arithmetic whatever the size of the value. In
   0.2.0 it used the caller's `decimal` context (28 digits by default), so
   `format(123456789012345678901234567890123, precision=3)` printed `123456789.012Sp`, and
@@ -73,7 +78,9 @@ repository, and the changes below are measured against 0.2.0.
   encoding cannot hold instead of failing with a traceback.
 - The command reads a value that starts with a minus sign (`format -1e3`,
   `parse -1.2k`) the same way on every Python version; before 3.14, argparse took such a
-  value for an option unless `--` came first.
+  value for an option unless `--` came first. `format -inf` and `format -nan` are read
+  as values too and exit 1 because they are not finite; any other dash followed by a
+  letter (`parse -k`, `--unit -B`) is still an option.
 - An invalid `--precision` or `--decimal-sep` value is a usage error (exit 2) that names
   the option, like every other invalid option.
 - `Development Status :: 5 - Production/Stable`.

@@ -14,6 +14,9 @@ if TYPE_CHECKING:
 #: Usage and data error messages are cut here, so a huge argument is never echoed back.
 MESSAGE_LIMIT = 300
 
+# argparse matches this at the start of an argument; the words are anchored to its end.
+_NEGATIVE_VALUE = re.compile(r"-(?:\.?\d|(?:inf|infinity|s?nan\d*)$)", re.IGNORECASE)
+
 
 def bounded(message: str) -> str:
     """Cut ``message`` to :data:`MESSAGE_LIMIT` characters."""
@@ -76,9 +79,11 @@ class Parser(argparse.ArgumentParser):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         # Up to 3.13 argparse takes "-1e3" or "-1.2k" for an option; 3.14 reads any
-        # "-digit" or "-.digit" as a value. No option here looks like a number, so the
-        # 3.14 rule is set on every version and they all behave the same.
-        self._negative_number_matcher = re.compile(r"-\.?\d")
+        # "-digit" or "-.digit" as a value. No option here looks like a number, so that
+        # rule is set on every version and they all behave the same. It also covers the
+        # whole words Decimal reads after a minus ("-inf", "-nan"), so "format -inf"
+        # reports a value that is not finite; any other dash and letter stays an option.
+        self._negative_number_matcher = _NEGATIVE_VALUE
 
     def error(self, message: str) -> NoReturn:
         self.exit(2, f"{self.format_usage()}{self.prog}: error: {bounded(message)}\n")

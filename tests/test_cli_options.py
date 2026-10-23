@@ -72,6 +72,56 @@ def test_invalid_option_values_are_usage_errors_naming_the_flag(
     assert len(err) < 1500
 
 
+@pytest.mark.parametrize(
+    ("args", "message"),
+    [
+        (
+            ["format", "5", "--precision", "abc"],
+            "argument --precision: invalid integer value: 'abc'",
+        ),
+        (["format", "5", "--precision", "-1"], "argument --precision: must be between 0 and 4300"),
+        (
+            ["format", "5", "--precision", "4301"],
+            "argument --precision: must be between 0 and 4300",
+        ),
+    ],
+)
+def test_precision_usage_errors_say_what_is_wrong(
+    capsys: pytest.CaptureFixture[str], args: list[str], message: str
+) -> None:
+    code, out, err = _run(capsys, *args)
+    assert (code, out) == (2, "") and err.rstrip().endswith(message), err
+
+
+@pytest.mark.parametrize("value", ["-inf", "-Infinity", "-INF", "-nan", "-NaN", "-sNaN", "-nan12"])
+def test_negative_infinities_and_nans_are_values_rejected_as_not_finite(
+    capsys: pytest.CaptureFixture[str], value: str
+) -> None:
+    expected = (1, "", "compactnum: error: value must be finite\n")
+    assert _run(capsys, "format", value) == expected
+    assert _run(capsys, "format", "--", value) == expected
+    assert _run(capsys, "format", value[1:]) == expected
+
+
+@pytest.mark.parametrize(
+    "args",
+    [
+        ["parse", "-k"],
+        ["parse", "-B"],
+        ["format", "-x"],
+        ["format", "-information"],
+        ["format", "-nancy"],
+        ["parse", "1k-B", "--unit", "-B"],
+        ["format", "5", "--unit", "-B"],
+    ],
+)
+def test_a_dash_and_text_that_is_no_number_stays_an_option(
+    capsys: pytest.CaptureFixture[str], args: list[str]
+) -> None:
+    code, out, err = _run(capsys, *args)
+    assert (code, out) == (2, "") and "usage:" in err
+
+
 def test_option_values_at_their_limits_are_accepted(capsys: pytest.CaptureFixture[str]) -> None:
     code, out, _ = _run(capsys, "format", "1200", "--precision", "4300", "--no-trim")
     assert (code, out) == (0, "1.2" + "0" * 4299 + "k\n")

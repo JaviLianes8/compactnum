@@ -90,3 +90,27 @@ def test_the_same_values_format_at_run_time() -> None:
     if importlib.util.find_spec("numpy") is not None:
         np = importlib.import_module("numpy")
         assert format(np.int64(1200)) == "1.2k" and format(np.float32(1.5)) == "1.5"
+
+
+def test_the_typed_consumer_runs_with_protocol_only_values() -> None:
+    class IndexOnly:
+        def __index__(self) -> int:
+            return 1200
+
+    class FloatOnly:
+        def __float__(self) -> float:
+            return 1500.0
+
+    namespace: dict[str, object] = {}
+    exec(compile(CONSUMER, "consumer", "exec"), namespace)
+    caller = namespace["caller"]
+    assert callable(caller)
+    assert caller(IndexOnly(), FloatOnly()) == [
+        "1.2k",
+        "1.5",
+        "2.5M",
+        "0.3",
+        "1.2k",
+        "1.5k",
+        "2,0KiB",
+    ]

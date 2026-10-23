@@ -25,7 +25,8 @@ _EXAMPLES = """examples:
   compactnum parse 1.2345k --exact              ->  1234.5
   compactnum parse -1.2k                        ->  -1200
 
-A value may start with a minus sign on every Python version; -- before it works too.
+A value may start with a minus sign (-inf and -nan included) on every Python version;
+-- before it works too.
 Exit codes: 0 done, 1 the value was rejected (or the output could not be written),
 2 bad usage (an invalid option value included).
 """

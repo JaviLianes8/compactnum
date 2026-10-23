@@ -74,7 +74,7 @@ def test_wheel_and_sdist_contents(dist: Path) -> None:
     names = zipfile.ZipFile(wheel).namelist()
     package = sorted(name for name in names if name.startswith("compactnum/"))
     modules = ["__init__", "__main__", "_cli", "_cli_io", "_errors", "_format", "_parse"]
-    expected = [f"compactnum/{name}.py" for name in [*modules, "_scales"]]
+    expected = [f"compactnum/{name}.py" for name in [*modules, "_scales", "_value"]]
     assert package == sorted([*expected, "compactnum/py.typed"])
     assert any(name.endswith(".dist-info/licenses/LICENSE") for name in names)
     metadata = next(name for name in names if name.endswith(".dist-info/METADATA"))

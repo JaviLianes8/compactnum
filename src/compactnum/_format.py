@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import numbers
 from decimal import (
     MAX_EMAX,
     MIN_EMIN,
@@ -26,8 +25,7 @@ from ._scales import (
     validate_separator,
     validate_style,
 )
-
-_INT_LIMIT = 10**MAX_DIGITS
+from ._value import coerce
 
 
 def format(
@@ -48,7 +46,10 @@ def format(
             ``float`` as its shortest ``repr`` (so ``1.05`` rounds like the
             decimal ``1.05``), and any other real number (a
             :class:`~fractions.Fraction`, a NumPy float) through ``float()``.
-            It must be finite and have at most 4300 integer digits.
+            Any other object with ``__index__`` is read exactly through it,
+            and one with only ``__float__`` through ``float()``, as the
+            annotation promises. It must be finite and have at most 4300
+            integer digits.
         precision: Decimals kept in the mantissa, from ``0`` to ``4300``.
         style: ``"short"`` for short-scale letters (``k M B T Qa Qi Sx Sp
             Oc No``), ``"metric"`` for SI prefixes (``k M G T P E Z Y R Q``),
@@ -70,7 +71,8 @@ def format(
         Values past the largest suffix keep that suffix with a bigger mantissa.
 
     Raises:
-        TypeError: If ``value`` is not a real number (``bool`` included), an
+        TypeError: If ``value`` is not a real number (``bool`` and NumPy
+            booleans included) or its ``__float__`` refuses, an
             integer argument is not an integer, ``trim_zeros`` is not a ``bool``,
             or a text argument is not a ``str``.
         ValueError: If ``value`` is not finite or too large, ``precision`` is
@@ -86,7 +88,7 @@ def format(
         >>> format(-999_999, style="metric")
         '-1M'
     """
-    number = _coerce(value)
+    number = coerce(value)
     digits = check_integer("precision", precision)
     if not 0 <= digits <= MAX_DIGITS:
         raise ValueError(f"precision must be between 0 and {MAX_DIGITS}")
@@ -127,32 +129,6 @@ def format(
     gap = " " if style == "long" and suffix else ""
     body = _render(mantissa, trim, decimal_sep)
     return f"{sign}{body}{gap}{suffix}{unit}"
-
-
-def _coerce(value: object) -> Decimal:
-    if isinstance(value, Decimal):
-        number = value
-    elif isinstance(value, bool) or not isinstance(value, numbers.Real):
-        raise TypeError(f"value must be a real number, not {type(value).__name__}")
-    elif isinstance(value, numbers.Integral):
-        integer = int(value)
-        if not -_INT_LIMIT < integer < _INT_LIMIT:
-            raise ValueError(f"value has more than {MAX_DIGITS} integer digits")
-        number = Decimal(integer)
-    else:
-        try:
-            number = Decimal(repr(float(value)))
-        except OverflowError:
-            raise ValueError("value is too large for a float") from None
-    if not number.is_finite():
-        raise ValueError("value must be finite")
-    if number and number.adjusted() >= MAX_DIGITS:
-        raise ValueError(f"value has more than {MAX_DIGITS} integer digits")
-    if number.adjusted() < -2 * MAX_DIGITS:
-        # Rounds to zero at every precision; an exponent this small could also be
-        # outside the range decimal arithmetic accepts.
-        return Decimal(0)
-    return number
 
 
 def _choose(magnitude: Decimal, entries: tuple[tuple[Decimal, str], ...]) -> tuple[Decimal, str]:

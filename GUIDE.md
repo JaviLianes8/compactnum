@@ -12,10 +12,13 @@ mantissa to `precision` decimals and writes the suffix.
 - **Input.** An integer (`int`, a NumPy integer) and a `Decimal` are read exactly, a
   `float` as its shortest `repr` (so `1.05` rounds like the decimal 1.05, not like the
   binary value just below it), and any other real number (a `Fraction`, a NumPy float)
-  through `float()`. `value` is annotated `SupportsFloat | SupportsIndex`, so a type
-  checker accepts all of them.
-  `bool`, strings, `None` and complex numbers raise `TypeError`. Infinities, NaNs and
-  values with more than 4300 integer digits raise `ValueError`.
+  through `float()`. `value` is annotated `SupportsFloat | SupportsIndex`, and the
+  runtime reads what the annotation accepts: any other object with `__index__` is read
+  exactly through it, and one with only `__float__` (a 0-d NumPy array, say) through
+  `float()`. `bool`, NumPy booleans, strings, `None`, complex numbers and objects whose
+  `__float__` refuses (a NumPy array of several elements) raise `TypeError`, which
+  names a type outside the builtins by module, as in `numpy.bool`. Infinities, NaNs
+  and values with more than 4300 integer digits raise `ValueError`.
 - **Rounding** is half-up: ties go away from zero. It works on the exact decimal value,
   so the result never depends on binary floating point or on the caller's `decimal`
   context.
@@ -161,7 +164,9 @@ decimal (scientific notation allowed). `compactnum parse TEXT` takes `--unit`,
 `--decimal-sep` and `--exact`; it prints whole values in full, other values as the
 nearest float, or the exact decimal with `--exact`. A value may start with a minus sign
 (`compactnum format -1e3`, `compactnum parse -1.2k`) on every supported Python; `--`
-before it (`compactnum parse -- -1.2k`) works too.
+before it (`compactnum parse -- -1.2k`) works too. That covers `-inf` and `-nan`, which
+`format` rejects as not finite (exit 1). A dash followed by anything else, such as
+`-k` or `--unit -B`, is read as an option, so it is a usage error unless `--` comes first.
 
 Exit codes: 0 done; 1 the value was rejected, or the output could not be written (a
 closed pipe, or a unit the output encoding cannot hold); 2 bad usage, including an

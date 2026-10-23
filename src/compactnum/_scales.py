@@ -13,6 +13,8 @@ from __future__ import annotations
 import operator
 from decimal import Decimal
 
+from ._errors import type_name
+
 #: Most integer digits of a value to format, and the largest precision. It mirrors
 #: CPython's default limit for converting between ``int`` and ``str``.
 MAX_DIGITS = 4300
@@ -94,14 +96,14 @@ def check_text(name: str, value: object) -> str:
     own ``__str__``, ``__eq__`` or ``__format__``.
     """
     if not isinstance(value, str):
-        raise TypeError(f"{name} must be a str, not {type(value).__name__}")
+        raise TypeError(f"{name} must be a str, not {type_name(value)}")
     return str.__str__(value)
 
 
 def check_bool(name: str, value: object) -> bool:
     """Return ``value`` if it is a ``bool``, else raise :class:`TypeError`."""
     if not isinstance(value, bool):
-        raise TypeError(f"{name} must be a bool, not {type(value).__name__}")
+        raise TypeError(f"{name} must be a bool, not {type_name(value)}")
     return value
 
 
@@ -112,7 +114,7 @@ def check_integer(name: str, value: object) -> int:
     try:
         return operator.index(value)  # type: ignore[arg-type]
     except TypeError:
-        raise TypeError(f"{name} must be an integer, not {type(value).__name__}") from None
+        raise TypeError(f"{name} must be an integer, not {type_name(value)}") from None
 
 
 def validate_style(style: object) -> str:
