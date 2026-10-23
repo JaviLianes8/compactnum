@@ -31,7 +31,7 @@ Progress:
 | 7 | Real ground truth | PASS: five fetched documents with a hash manifest; 3,000 ICU 78.3 and 3,000 GNU numfmt 8.32 outputs captured and compared, plus live runs |
 | 8 | Real e2e from the wheel | PASS: wheel installed in a fresh venv, used from an empty folder with `-I`, console script and `python -m` by subprocess; no PyPI release to upgrade from |
 | 9 | Seeded fuzz | PASS: 51,000 seeded oracle cases and 66,000 hostile calls per run, timing linear |
-| 10 | Supported Pythons | PASS: CPython 3.10.19, 3.11.5, 3.12.12, 3.13.2, 3.14.2 and 3.14.2t, the sdist suite against the installed wheel, 176 passed each |
+| 10 | Supported Pythons | PASS: CPython 3.10.19, 3.11.5, 3.12.12, 3.13.2, 3.14.2 and 3.14.2t, the sdist suite against the installed wheel, 191 passed each |
 | 11 | README, `twine check` | PASS: `twine check --strict` PASSED for wheel and sdist; absolute links tested; certified badge |
 | 12 | Dated CHANGELOG | PASS: `## [1.0.0] - 2026-10-22` |
 | 13 | pyproject | PASS: 1.0.0, Production/Stable, Python 3.10 to 3.14 classifiers, MIT, Homepage/Source/Issues/Changelog, keywords, `dependencies = []` (tested) |
@@ -171,11 +171,13 @@ scripts; no fetched documents, process notes or caches. Every interpreter here f
 `requires-python` up got a fresh venv with the built wheel, and the sdist's suite ran with
 `src` removed, `COMPACTNUM_E2E=1` (wheel contents, install in another venv, eight CLI
 cases through the console script and `python -m`): CPython 3.10.19, 3.11.5, 3.12.12,
-3.13.2, 3.14.2 and 3.14.2 free-threaded, 176 passed each. 3.8 and 3.9 are below
-`requires-python`.
+3.13.2, 3.14.2 and 3.14.2 free-threaded, 191 passed each at c9342bb (176 at 3fc76f8).
+3.8 and 3.9 are below `requires-python`.
 
 ## Gates (item 15)
 
-At 3fc76f8 from a fresh clone, each alone: `ruff format --check .`, `ruff check .`,
-`mypy --strict src`, `mypy --strict src tests` and `pytest` with `COMPACTNUM_E2E=1`
-(181 passed) all exit 0. Final run at the head: see the last section.
+At c9342bb (the code of b805b23) from a fresh clone on this PC, with the fetched documents,
+Node.js and GNU numfmt present, each command alone: `ruff format --check .`,
+`ruff check .`, `mypy --strict src`, `mypy --strict src tests` and `pytest` with
+`COMPACTNUM_E2E=1` (196 passed, no skips) all exit 0; `twine check --strict` PASSED for
+the wheel and the sdist built from that clone.
