@@ -15,7 +15,7 @@ Progress:
 - [x] Packaging, wheel e2e, every Python on this PC (items 8, 10, 13, 14)
 - [x] Gates (item 15)
 - [ ] Independent reviewer (item 16)
-- [ ] Five QA lenses (item 19)
+- [ ] Five QA lenses (item 19): round 1 reported 17 findings, all fixed at 1a86ea1; re-verification by the lenses pending
 - [ ] PR #3 from `release/1.0.0` opened and trace guard CLEAN; merge and publish pending (item 17)
 
 ## Scorecard (items 1 to 15 and 18)
@@ -61,8 +61,10 @@ context; type checks (`TypeError`) and bounds (4300 digits, precision 0 to 4300)
 digits only; normalized `Decimal` results; scales 9 and 10 (`Oc No`, SI `R Q`, the
 words); bounded messages; `CompactError` reports the public module; the command reads
 values exactly, exits 2 on usage errors with bounded messages, survives a closed pipe and
-reports unencodable output. `value` stays typed `float | Decimal`; other real numbers are
-accepted at run time through `float()`, as documented.
+reports unencodable output. QA round 1 changed three things: `value` is annotated
+`SupportsFloat | SupportsIndex` (every documented value type passes `mypy --strict`), the
+default style is named `"short"` (`"si"` stays as its 0.x name: it never wrote SI
+prefixes), and `trim_zeros` must be a `bool`.
 
 ## Ground truth (item 7)
 
@@ -181,3 +183,65 @@ Node.js and GNU numfmt present, each command alone: `ruff format --check .`,
 `ruff check .`, `mypy --strict src`, `mypy --strict src tests` and `pytest` with
 `COMPACTNUM_E2E=1` (196 passed, no skips) all exit 0; `twine check --strict` PASSED for
 the wheel and the sdist built from that clone.
+
+## QA lenses (item 19)
+
+### Round 1 (reviewed at 4f53276, fixed at 1a86ea1)
+
+Five lenses ran against 4f53276. Lens b (ground truth: 148 table checks, 58,576 ICU,
+34,400 numfmt and 276,894 exact-reference comparisons) found only the round-trip limit
+that lenses a and c also found; lens d (packaging: build, twine, wheel and sdist e2e on
+six interpreters, upgrade from 0.2.0) found only the version-dependent negative values.
+Every finding below was fixed; none is disputed.
+
+| Lens | Id | Severity | Finding | Fix |
+| --- | --- | --- | --- | --- |
+| a | F1 | medium | `value: float \| Decimal` rejected `Fraction` and NumPy values for typed callers | annotated `SupportsFloat \| SupportsIndex`; `tests/test_typing.py` runs `mypy --strict` on a consumer (with NumPy when installed) and checks a `str` is still rejected |
+| a | F2 | medium | the default style `"si"` wrote short-scale letters, not SI prefixes | default renamed `"short"`, `"si"` kept as its 0.x name; README, GUIDE, docstring, CLI and CHANGELOG |
+| a, b, c | F3, F1, F2 | low | `format` could write up to 8576 digits, `parse_decimal` read at most 4300 | the parser reads 8600 digits; the round trip is tested at the extremes (precision 4300 on 4300-digit values, base 1024, long style, units and separators) against the independent reference |
+| a | F4 | low | `parse` docstring said both parsers accept exactly the same text | reworded: same syntax, `parse` also refuses a non-whole value too large for a float |
+| a | F5 | low | `trim_zeros` was read by truth value (`"False"` trimmed) | `TypeError` unless it is a `bool`; docstring, GUIDE error table, CHANGELOG |
+| a | F6 | low | invalid `--precision` and `--decimal-sep` values exited 1 naming `decimal_sep`; README exit-code line incomplete | both are argparse type checks: exit 2 naming the option; README, GUIDE and help aligned |
+| a | F7 | low | CHANGELOG said 0.2.0 raised `AttributeError` for `decimal_sep` | now "for `unit`" (re-checked against c44a14e) |
+| a | F8 | low | unit matching failed when case folding changes the length (`SS` and `ß`) | characters are folded one by one from the end (linear, tested with 200,000-character units) |
+| c | F1 | medium | `str` subclasses (string enums) were read through their own `__str__`: `KeyError`, wrong separator check, `1.5KiUnit.BYTE` | every text argument is read as `str.__str__(value)`, the plain characters |
+| d | F1 | low | `format -1e3` and `parse -1.2k` were usage errors on 3.10 to 3.13 and worked on 3.14 | the 3.14 negative-number rule is set on every parser; in-process and subprocess tests |
+| e | E1 to E8 | medium, low | no test bit on: the style and base message limits, the missing-unit excerpt, the parsers' separator check, unit whitespace, the CLI reading values exactly, lost `--help`/`--version` output, the quick refusal of a huge int | one contract test each in `tests/test_limits.py` and `tests/test_cli_options.py` |
+
+Contract tests first: the new tests, run against 4f53276, failed 36 times (typing, string
+enums, `trim_zeros`, case folding, the round trip, the digit limit, negative values,
+option errors, the signature and the default style). The lens e tests passed there, as
+expected: those were missing tests, not wrong behaviour.
+
+Round-1 mutants, each applied alone to a clean clone of 1a86ea1 on Elena's PC (CPython
+3.14.2, full suite with `-x`); the baseline passed:
+
+| Id | Mutation | Caught by |
+| --- | --- | --- |
+| R01 | unknown-style message echoes the style | `tests/test_limits.py::test_an_unknown_style_message_never_echoes_a_long_style` |
+| R02 | unknown-base message echoes the base | `tests/test_limits.py::test_an_unknown_base_message_never_echoes_a_huge_base` |
+| R03 | missing-unit message echoes the unit | `tests/test_limits.py::test_a_missing_unit_message_cuts_a_huge_unit` |
+| R04 | parsers skip the separator check | `tests/test_limits.py::test_parsers_validate_the_decimal_separator` |
+| R05 | unit whitespace kept | `tests/test_limits.py::test_whitespace_around_the_unit_is_ignored` |
+| R06 | CLI value read through `float` | `tests/test_cli_options.py::test_the_value_is_read_exactly` |
+| R07 | lost help or version output exits 0 | `tests/test_cli_options.py::test_lost_output_exits_one` |
+| R08 | no quick refusal of a huge int | `tests/test_limits.py::test_a_huge_integer_is_refused_at_once` |
+| R09 | value annotation narrowed back | `tests/test_contract.py::test_signatures_are_pinned` (and `tests/test_typing.py`) |
+| R10 | default style back to `"si"` | `tests/test_contract.py::test_signatures_are_pinned` |
+| R11 | `trim_zeros` read by truth value | `tests/test_text_types.py::test_trim_zeros_must_be_a_bool` |
+| R12 | unit folded by `lower()` | `tests/test_text_types.py::test_unit_matching_is_caseless_even_when_casefold_changes_length` |
+| R13 | `str` subclasses kept as they are | `tests/test_text_types.py::test_string_enum_members_are_read_by_their_value` |
+| R14 | parser digit limit back to 4300 | `tests/test_limits.py::test_parse_decimal_reads_back_everything_format_writes` |
+| R15 | argparse negative-number rule left per version | survives on 3.14 (its own rule is the same, so equivalent there); killed on 3.11 and 3.13 by `tests/test_cli_options.py::test_negative_values_need_no_separator_on_any_python` |
+| R16 | CLI precision range unchecked | `tests/test_cli_options.py::test_invalid_option_values_are_usage_errors_naming_the_flag` |
+| R17 | CLI separator unchecked | `tests/test_cli_options.py::test_invalid_option_values_are_usage_errors_naming_the_flag` |
+
+Gates at 1a86ea1 from a fresh clone of the pushed branch on this PC, with the fetched
+documents, Node.js and GNU numfmt present: `ruff format --check .`, `ruff check .`,
+`mypy --strict src`, `mypy --strict src tests` and `pytest` (259 passed, 2 opt-in e2e
+skipped) each exit 0. With `COMPACTNUM_E2E=1`: 261 passed, no skips, on CPython 3.10.19,
+3.11.5, 3.12.12, 3.13.2, 3.14.2 and 3.14.2 free-threaded.
+
+### Disputed findings
+
+None in round 1.
