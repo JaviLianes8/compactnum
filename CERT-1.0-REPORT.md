@@ -14,16 +14,16 @@ Progress:
 - [x] Docs: README, GUIDE, CHANGELOG (items 11, 12)
 - [x] Packaging, wheel e2e, every Python on this PC (items 8, 10, 13, 14)
 - [x] Gates (item 15)
-- [ ] Independent reviewer (item 16): round 1 (at e061874) scored item 18 FAIL, fixed at
-  556c6cf; re-review pending
-- [ ] Five QA lenses (item 19): round 1 reported 17 findings, all fixed at 1a86ea1; round 2
+- [x] Independent reviewer (item 16): round 1 (at e061874) scored item 18 FAIL, fixed at
+  556c6cf; round 2 (at 0fd443c) scored every item PASS
+- [x] Five QA lenses (item 19): round 1 reported 17 findings, all fixed at 1a86ea1; round 2
   re-verified them and reported 9 new ones, all fixed at 7da7243; round 3 re-verified those
   and reported 9 new ones, all fixed at 0a74dcf; round 4 re-verified those and reported 6
   new ones (one found by two lenses), all fixed at ca77018; round 5 re-verified those and
   reported 3 new ones, all fixed at d56401b; round 6 re-verified those and reported 1 new
   one, fixed at 59e2a1c; round 7 re-verified it and reported 1 new one, fixed at 41a9cd2;
-  re-verification pending
-- [ ] PR #3 from `release/1.0.0` opened and trace guard CLEAN; merge and publish pending (item 17)
+  round 8 re-verified it: all five lenses PASS
+- [x] PR #3 from `release/1.0.0` opened (item 17); trace guard, merge and publish pending
 
 ## Scorecard (items 1 to 15 and 18)
 
@@ -525,6 +525,89 @@ Gates: `ruff format --check .`, `ruff check .`, `mypy --strict src` and
 and so does `pytest` with `COMPACTNUM_E2E=1` (326 passed, 1 skipped: GNU numfmt is not
 on that PC).
 
+### Round 8 (re-verification, every lens PASS)
+
+Lens e re-ran the round-7 finding at e061874: fixed. Under R07 `np.datetime64(1500, "ns")`
+formats as `1.5k` (8 of 48 values differ on CPython 3.11.5 with NumPy 2.4.6 and on 3.13.2
+with NumPy 2.5.4), and the mutant is killed by
+`tests/test_value_types.py::test_numpy_values_that_hold_no_real_number_are_refused` on
+both, and by the full suite on the laptop (CPython 3.14.6, NumPy 2.5.4; unmutated, 313
+passed and 12 skipped). Its sweep of 10 new mutants on `_value._is_refused` and
+`Parser._get_values`: 9 killed; dropping the argparse `--` handling survives the suite on
+3.14.6 and is equivalent there and on 3.13.2, whose argparse already reads `--` as text (0
+of 11 CLI calls differ), and is killed on 3.11.5 by `tests/test_cli.py`. No new finding.
+
+Lenses b and c re-verified their round-1 findings at 0848be4 and swept the changed code:
+lens b ran 39 probes on CPython 3.11.5 and 3.13.2 (the three round-trip repros of 4301 to
+4356 digits, the longest output of 8576 digits in every style, the 8600 and 8601 digit
+limits, the case-folded units, string enums, the default style and the command line),
+0 failing; lens c ran 40 probes on CPython 3.9.25 to 3.14.2 (case folding that changes
+length, a lone surrogate, 30,000 seeded round trips with hostile units and 0 mismatches,
+linear scaling from 100,000 to 1,600,000 characters, the 8600-digit limit under a caller
+context with `int_max_str_digits=640`, bounded messages, no traceback and no hang), all
+passing. Lens a (round 6, at d56401b) checked the argparse `--` versions against stock
+`argparse.py` from 59 CPython tags and ran 10 probes, and lens d (round 5, at 3eb194d)
+ran the sdist suite against the installed wheel on CPython 3.10.19, 3.11.5, 3.12.12,
+3.13.2, 3.14.2 and 3.14.2t (311 passed, 7 upstream skips each), the sdist install, a
+`mypy --strict` consumer and the PyPI check (404, not published); neither found anything.
+
+### Final QA verdicts (item 19)
+
+Each lens worked from the 1.0.0 bar, ran things rather than reading them, and posted
+nothing to GitHub. The reports are kept in the local certification folder, outside the repository.
+
+| Lens | Scope | Rounds | Final verdict | Report | Commit of the final round |
+| --- | --- | --- | --- | --- | --- |
+| a | API and docs | 6 | PASS | `lens-a-r6/REPORT.md` | d56401b |
+| b | Correctness and ground truth | 2 | PASS | `lens-b-r2/probes-3.11.log`, `lens-b-r2/probes-3.13.log` | 0848be4 |
+| c | Adversarial and robustness | 2 | PASS | `lens-c-r2/sweep-output.txt`, `lens-c-r2/cli-output.txt` | 0848be4 |
+| d | Packaging and real e2e | 5 | PASS | `lens-d-r5/matrix.log` | 3eb194d |
+| e | Contract strength | 8 | PASS | `lens-e-r8/sweep-portatil.log` | e061874 |
+
+After 3eb194d the only change to `src` is one comment, so lenses a, d and e saw the
+release code. The code changes after 0848be4, where lenses b and c ended, are the fixes of
+rounds 2 to 4 (values with only `__index__` or `__float__`, type names, negative
+infinities, the NumPy and complex refusals, the `--` handling), each re-verified by the
+lens that found it and swept again by lenses a, d and e.
+
+### Independent review round 2 (reviewed at 0fd443c, every item PASS)
+
+The reviewer audited 0fd443c against every item of the 1.0.0 bar. Gates on this PC:
+`ruff format --check .` (37 files), `ruff check .`, `mypy --strict src` (9 files) and
+`mypy --strict src tests` (30 files) each exit 0. On Elena's PC (a clone of 0fd443c,
+CPython 3.14.2, NumPy 2.5.4): `pytest` exits 0 without and with the fetched documents (all
+five hashes match the manifest), the `COMPACTNUM_E2E=1` wheel tests pass, `python -m build`
+and `twine check --strict` pass for both files. The wheel, installed in a fresh venv on
+CPython 3.10.22, 3.11.17, 3.12.15, 3.13.17, 3.14.9 and 3.14.9t, runs the sdist suite with
+319 passed and 3 skipped each (GNU numfmt, and the two typing tests where mypy is not
+installed); 3.9.25 refuses the install, as `requires-python` says. The reviewer's own 33
+mutants: 32 killed, R04 equivalent (the author's M12); the 9 mutants of the round-1 fixes
+(the 300-character cut and the unit scan) are all killed. README links answer 200, except
+`GUIDE.md` on `main` (it lands with the merge; 200 on `release/1.0.0`) and LinkedIn, which
+refuses automated requests.
+
+| # | Item | Result |
+| --- | --- | --- |
+| 1 | Public API reviewed for stability | PASS |
+| 2 | `__all__` lists exactly the public names | PASS |
+| 3 | Docstrings with runnable examples, doctests pass | PASS |
+| 4 | Typed end to end | PASS |
+| 5 | Typed, documented, safe errors | PASS |
+| 6 | Contract test of every public name | PASS |
+| 7 | Real ground truth | PASS |
+| 8 | Real e2e from the wheel | PASS |
+| 9 | Seeded fuzz and property tests | PASS |
+| 10 | Supported Pythons | PASS |
+| 11 | README and `twine check` | PASS |
+| 12 | Dated CHANGELOG | PASS |
+| 13 | pyproject | PASS |
+| 14 | sdist and wheel contents | PASS |
+| 15 | Gates exit 0 alone | PASS |
+| 16 | Independent reviewer | PASS |
+| 17 | PR from `release/1.0.0` | PASS (PR #3; trace guard, merge and publish follow) |
+| 18 | Contracts bite | PASS |
+| 19 | Five independent QA lenses | PASS |
+
 ### Disputed findings
 
-None in rounds 1 to 7 or in independent review round 1.
+None in rounds 1 to 8 or in independent review rounds 1 and 2.
