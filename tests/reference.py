@@ -107,4 +107,4 @@ def shown(value: object, *, precision: int = 1, style: str = "si", base: int = 1
     """The exact quantity that ``format`` shows, suffix applied."""
     names = suffixes(style, base)
     mantissa, index = rounded(value, precision, base, len(names))
-    return mantissa * base**index
+    return mantissa * Fraction(base) ** index

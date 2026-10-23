@@ -14,6 +14,8 @@ from compactnum import format, parse, parse_decimal
 
 SEEDS = [1, 2, 3]
 STYLES = ["si", "short", "metric", "long"]
+ARABIC_SEPARATOR = chr(0x066B)
+MICRO = chr(0x00B5)
 
 
 def _value(rng: random.Random) -> int | float | Decimal:
@@ -23,14 +25,16 @@ def _value(rng: random.Random) -> int | float | Decimal:
         return sign * rng.randrange(10 ** rng.randint(1, 40))
     if kind == 1:  # just below a scale boundary, where rounding carries
         power = rng.randint(1, 12)
-        return sign * (1000**power - rng.randint(1, 10 ** rng.randint(0, 3 * power)))
+        return int(sign * (1000**power - rng.randint(1, 10 ** rng.randint(0, 3 * power))))
     if kind == 2:  # exact ties at the shown precision
         return Decimal(sign * (rng.randrange(10**6) * 10 + 5)).scaleb(rng.randint(-3, 30))
     if kind == 3:
         return sign * rng.uniform(0, 10 ** rng.randint(0, 30))
     if kind == 4:
         return Decimal(sign * rng.randrange(10 ** rng.randint(1, 30))).scaleb(rng.randint(-40, 40))
-    return sign * 1024 ** rng.randint(0, 9) * rng.randrange(1, 2048) // rng.choice([1, 2, 4, 1024])
+    return int(
+        sign * 1024 ** rng.randint(0, 9) * rng.randrange(1, 2048) // rng.choice([1, 2, 4, 1024])
+    )
 
 
 @pytest.mark.parametrize("seed", SEEDS)
@@ -44,7 +48,7 @@ def test_format_matches_the_reference(seed: int) -> None:
             "base": rng.choice([1000, 1024]),
             "unit": rng.choice(["", "B", "/s", " units"]),
             "trim_zeros": rng.random() < 0.5,
-            "decimal_sep": rng.choice([".", ",", "٫"]),
+            "decimal_sep": rng.choice([".", ",", ARABIC_SEPARATOR]),
         }
         expected = reference.render(value, **options)  # type: ignore[arg-type]
         assert format(value, **options) == expected, (value, options)  # type: ignore[arg-type]
@@ -111,8 +115,8 @@ def test_units_and_separators_round_trip(seed: int) -> None:
     rng = random.Random(seed)
     for _ in range(2000):
         text, expected = _text(rng)
-        unit = rng.choice(["B", "bit", "/s", "µ"])
-        separator = rng.choice([",", "'", "٫"])
+        unit = rng.choice(["B", "bit", "/s", MICRO])
+        separator = rng.choice([",", "'", ARABIC_SEPARATOR])
         dressed = text.rstrip() + rng.choice(["", " "]) + unit.upper()
         dressed = dressed.replace(".", separator)
         assert Fraction(parse_decimal(dressed, unit=unit, decimal_sep=separator)) == expected
