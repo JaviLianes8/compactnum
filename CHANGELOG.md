@@ -91,8 +91,8 @@ repository, and the changes below are measured against 0.2.0.
   the option, like every other invalid option.
 - An option given the value `--` with `=` reads it as the text `--` on every Python
   version, so `--unit=--` is the unit `--` and `--precision=--` is a usage error (exit
-  2). Before 3.12, argparse handed such an option an empty list, and the command
-  failed with a traceback.
+  2). On Python 3.10, 3.11 before 3.11.8 and 3.12 before 3.12.2, argparse handed such
+  an option an empty list, and the command failed with a traceback.
 - `Development Status :: 5 - Production/Stable`.
 
 ## [0.2.0]

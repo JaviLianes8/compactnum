@@ -86,9 +86,9 @@ class Parser(argparse.ArgumentParser):
         self._negative_number_matcher = _NEGATIVE_VALUE
 
     def _get_values(self, action: argparse.Action, arg_strings: list[str]) -> Any:
-        # Before 3.12 argparse drops "--" from an option's values, so "--unit=--" gave
-        # the option an empty list that skipped its checks; read it as the text "--",
-        # as later versions do.
+        # On 3.10, 3.11 before 3.11.8 and 3.12 before 3.12.2, argparse drops "--" from an
+        # option's values, so "--unit=--" gave the option an empty list that skipped its
+        # checks; read it as the text "--", as later versions do.
         if action.option_strings and action.nargs is None and arg_strings == ["--"]:
             value = self._get_value(action, "--")
             self._check_value(action, value)

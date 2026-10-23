@@ -148,7 +148,11 @@ def test_complex_numbers_with_float_are_refused() -> None:
 
 def test_numpy_values_that_hold_no_real_number_are_refused() -> None:
     np: Any = _numpy()
+    # NumPy 2 adds a variable-width text type (kind "T"); NumPy 1 has none.
+    string_dtype = getattr(getattr(np, "dtypes", None), "StringDType", None)
+    texts = [] if string_dtype is None else [np.array("1200", dtype=string_dtype())]
     for value in (
+        *texts,
         np.array(True),
         np.array(False),
         np.array(1500 + 0j),

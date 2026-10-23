@@ -18,7 +18,8 @@ Progress:
 - [ ] Five QA lenses (item 19): round 1 reported 17 findings, all fixed at 1a86ea1; round 2
   re-verified them and reported 9 new ones, all fixed at 7da7243; round 3 re-verified those
   and reported 9 new ones, all fixed at 0a74dcf; round 4 re-verified those and reported 6
-  new ones (one found by two lenses), all fixed at ca77018; re-verification pending
+  new ones (one found by two lenses), all fixed at ca77018; round 5 re-verified those and
+  reported 3 new ones, all fixed in the round 5 commit; re-verification pending
 - [ ] PR #3 from `release/1.0.0` opened and trace guard CLEAN; merge and publish pending (item 17)
 
 ## Scorecard (items 1 to 15 and 18)
@@ -357,7 +358,7 @@ findings, all fixed; none is disputed:
 
 | Lens | Id | Severity | Finding | Fix |
 | --- | --- | --- | --- | --- |
-| a, d | N5, F4 | low | on CPython 3.10 and 3.11, `--unit=--` (and `--precision=--`, `--base=--`, `--style=--`, `--decimal-sep=--`) crashed with a `TypeError` traceback, exit 1: argparse before 3.12 drops `--` from an option's values and handed the option an empty list that skipped its checks | the parser reads an option value of exactly `--` as that text and runs the option's own type and choices check on it, as 3.12 and later do: `format 1500 --unit=--` prints `1.5k--`, the others exit 2 naming the option; GUIDE and CHANGELOG |
+| a, d | N5, F4 | low | on CPython 3.10 and 3.11, `--unit=--` (and `--precision=--`, `--base=--`, `--style=--`, `--decimal-sep=--`) crashed with a `TypeError` traceback, exit 1: argparse on 3.10, 3.11 before 3.11.8 and 3.12 before 3.12.2 drops `--` from an option's values and handed the option an empty list that skipped its checks | the parser reads an option value of exactly `--` as that text and runs the option's own type and choices check on it, as later versions do: `format 1500 --unit=--` prints `1.5k--`, the others exit 2 naming the option; GUIDE and CHANGELOG |
 | e | E20 (N12, N13) | medium | no test of NumPy void values, so a denylist of data type kinds or an allowed `V` kind survived | `np.void(b"12")` and `np.array(np.void(b"12"))` must be refused, naming `numpy.void` and `numpy.ndarray` |
 | e | E21 (N02, N03) | low | the `bytes` and `bytearray` entries of the refused types were never exercised | `tests/test_value_edges.py`: `bytes` and `bytearray` subclasses with `__float__` must be refused |
 | e | E22 (N05) | low | nothing pinned that only NumPy's own boolean types are refused by name | stand-ins named `bool` and `bool_` from module `mylib` with `__index__` must format as `1.2k` |
@@ -391,6 +392,38 @@ Gates at ca77018: `ruff format --check .`, `ruff check .`, `mypy --strict src` a
 and so does `pytest` with `COMPACTNUM_E2E=1` (8 skipped: the fetched documents and GNU
 numfmt are not on that PC).
 
+### Round 5 (reviewed at 3eb194d)
+
+Lens a re-ran N5 on CPython 3.11.5 and 3.13.2 (fixed: `--unit=--` reads as the unit, the
+other options exit 2 naming themselves, no traceback), ran 40 probes (34 CLI probes on
+both interpreters and on stock `argparse.py` from twelve CPython tags, 6 on the GUIDE
+claim about a `ValueError` from the value's own protocol), all as documented. Lens e ran
+new mutants against the round-4 fixes; two survived. New findings, all fixed; none is
+disputed:
+
+| Lens | Id | Severity | Finding | Fix |
+| --- | --- | --- | --- | --- |
+| a | N6 | low | the CHANGELOG, the `_get_values` comment and a test comment said argparse dropped `--` from an option's values "before 3.12"; stock `argparse.py` does so on 3.10, on 3.11 before 3.11.8 and on 3.12 before 3.12.2 | CHANGELOG, `src/compactnum/_cli_io.py` and `tests/test_cli.py` name those versions |
+| e | E25 (G13) | low | no test read a `--` given after the `--` separator, so dropping every `--` before delegating to argparse survived | `parse -- --` must exit 1 with `not compact notation: '--'` and `format -- --` exit 2 with `invalid number value: '--'` |
+| e | E26 (V04, V05) | low | no test of NumPy `StringDType` arrays (kind `T`), so a denylist of kinds without `T`, or `T` added to the allowed kinds, survived | `np.array("1200", dtype=StringDType())` must be refused, naming `numpy.ndarray` (NumPy 2 and later; NumPy 1 has no such type) |
+
+No behaviour changed in this round: the new tests pin what the code already did and pass
+on the code at 3eb194d. Each surviving mutant was applied alone to a copy of the fixed
+tree and `tests/test_cli.py` with `tests/test_value_types.py` run on CPython 3.11.5 and
+NumPy 2.4.6:
+
+| Id | Mutation | Caught by |
+| --- | --- | --- |
+| G13 | every `--` dropped before delegating to argparse | `tests/test_cli.py::test_an_option_value_of_two_dashes_is_read_as_text_on_every_python` (`format -- --`, `parse -- --`) |
+| V05 | `T` added to the allowed data type kinds | `tests/test_value_types.py::test_numpy_values_that_hold_no_real_number_are_refused` |
+| V04 | data type kinds as a denylist (`b c U S m M O V`) | `tests/test_value_types.py::test_numpy_values_that_hold_no_real_number_are_refused` |
+
+The changed dash test passes on 3.10.19, 3.11.5 and 3.12.12 on this PC. Gates on this
+PC: `ruff format --check .`, `ruff check .` and `mypy --strict src tests` exit 0.
+On Elena's PC (CPython 3.14.2, NumPy 2.5.4, a clone of the branch) `pytest` exits 0,
+and so does `pytest` with `COMPACTNUM_E2E=1` (8 skipped: the fetched documents and GNU
+numfmt are not on that PC).
+
 ### Disputed findings
 
-None in rounds 1 to 4.
+None in rounds 1 to 5.

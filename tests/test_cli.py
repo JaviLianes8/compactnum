@@ -171,12 +171,15 @@ def test_a_closed_output_pipe_exits_quietly() -> None:
         (["format", "1500", "--style=--"], 2, b"argument --style: invalid choice: '--'"),
         (["format", "1500", "--decimal-sep=--"], 2, b"argument --decimal-sep: must be one"),
         (["parse", "1k", "--decimal-sep=--"], 2, b"argument --decimal-sep: must be one"),
+        (["parse", "--", "--"], 1, b"compactnum: error: not compact notation: '--'"),
+        (["format", "--", "--"], 2, b"argument value: invalid number value: '--'"),
     ],
 )
 def test_an_option_value_of_two_dashes_is_read_as_text_on_every_python(
     args: list[str], code: int, expected: bytes
 ) -> None:
-    # Before 3.12 argparse drops "--" from an option's values, which left it an empty list.
+    # Older argparse (3.10, 3.11 before 3.11.8, 3.12 before 3.12.2) drops "--" from an
+    # option's values, which left it an empty list. A "--" after the separator is text too.
     done = _subprocess(*args)
     assert done.returncode == code and b"Traceback" not in done.stderr
     assert expected in (done.stdout if code == 0 else done.stderr)
