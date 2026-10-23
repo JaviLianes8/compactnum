@@ -14,7 +14,8 @@ Progress:
 - [x] Docs: README, GUIDE, CHANGELOG (items 11, 12)
 - [x] Packaging, wheel e2e, every Python on this PC (items 8, 10, 13, 14)
 - [x] Gates (item 15)
-- [ ] Independent reviewer (item 16)
+- [ ] Independent reviewer (item 16): round 1 (at e061874) scored item 18 FAIL, fixed at
+  556c6cf; re-review pending
 - [ ] Five QA lenses (item 19): round 1 reported 17 findings, all fixed at 1a86ea1; round 2
   re-verified them and reported 9 new ones, all fixed at 7da7243; round 3 re-verified those
   and reported 9 new ones, all fixed at 0a74dcf; round 4 re-verified those and reported 6
@@ -43,7 +44,7 @@ Progress:
 | 13 | pyproject | PASS: 1.0.0, Production/Stable, Python 3.10 to 3.14 classifiers, MIT, Homepage/Source/Issues/Changelog, keywords, `dependencies = []` (tested) |
 | 14 | sdist and wheel contents | PASS: listed and asserted by `tests/test_e2e_wheel.py` |
 | 15 | Gates exit 0 alone | PASS: see Gates |
-| 18 | Contracts bite | PASS: 43 author mutants, 41 killed, 2 equivalent (proven by a differential run) |
+| 18 | Contracts bite | PASS: 46 author mutants at 556c6cf, 44 killed, 2 equivalent (proven by a differential run) |
 
 ## Defects found in 0.2.0
 
@@ -114,15 +115,26 @@ with `prec=1` and every trap set, and with `sys.set_int_max_str_digits(640)`.
 
 ## Author mutation round (item 18)
 
-Each mutant applied alone to a fresh clone of b805b23 on Elena's PC (CPython 3.14.2, the
-fetched documents present), `__pycache__` purged, the full suite run with `-x` and a 300 s
-per-test limit. Baseline: 194 passed, 2 skipped (the opt-in e2e tests). The first runs at
-baa71ef and 16dbfb9 left M29, M37 (the old stderr escaping, redundant with Python's own),
-M39 and a redundant silencing call in `write` alive: contracts added and the redundant
-code removed in 16dbfb9 and b805b23. M07 and M12 are equivalent: a value exactly at a
-scale factor rounds to the base and carries, and the integer bound is checked again by
-the digit test; 361,059 `format` outputs over every power of 10, 1000 and 1024, their
-neighbours and the 4300-digit limits are byte-identical with and without each mutant.
+Each mutant applied alone to a fresh clone of 556c6cf on Elena's PC (CPython 3.14.2,
+NumPy 2.5.4, the fetched documents present), `__pycache__` purged, the full suite run
+with `-x` and a 300 s per-test limit; unmutated, the suite passes there (see the
+independent review round 1 below). The first table was proven at b805b23; the code
+later moved to `_value.py` and `PARSE_DIGITS`, so M06, M09, M10, M12, M20, M24, M25,
+M31, M39 and M42 were ported to the code they now mutate and the whole table was run
+again at the release code. The independent review at e061874 found two survivors, now
+M45/M46 and M47, killed by the contracts added in 556c6cf. Earlier runs at baa71ef and
+16dbfb9 left M29, M37 (the old stderr escaping, redundant with Python's own), M39 and a
+redundant silencing call in `write` alive: contracts added and the redundant code
+removed in 16dbfb9 and b805b23.
+
+M07 and M12 are equivalent. A value exactly at a scale factor rounds to the base and
+carries. An integer of exactly -10**4300 passes the mutated bound in `_integer`, but
+`coerce` then checks the digit count and raises the same `ValueError` with the same
+message (the reviewer's R04 is this mutant). 182,630 `format` outcomes (every power of
+10 up to the 4300-digit limit and its neighbours, both signs, every scale factor of 1000
+and 1024 and values just below it, integers given through `__index__` at both limits,
+seven option sets) hash the same with and without each mutant, at 556c6cf on Elena's
+PC: sha256 d4dafde2c385e5cb2637d1125795770741e8e71c051d63a8e52596c79184a1e1.
 
 | Id | Mutation | File | Result | Caught by |
 | --- | --- | --- | --- | --- |
@@ -131,13 +143,13 @@ neighbours and the 4300-digit limits are byte-identical with and without each mu
 | M03 | minus sign on a rounded zero | `_format.py` | killed | `tests/test_contract.py::test_format_promise_in_one_place` |
 | M04 | space after a bare number in long style | `_format.py` | killed | `tests/test_format.py::test_long_style_uses_words_with_a_space` |
 | M05 | trim zeros of whole mantissas | `_format.py` | killed | `tests/test_format.py::test_value_limits_are_exact` |
-| M06 | floats read as exact binary values | `_format.py` | killed | `tests/test_hostile.py::test_numeric_types_are_read_as_documented` |
+| M06 | floats read as exact binary values | `_value.py` | killed | `tests/test_hostile.py::test_numeric_types_are_read_as_documented` |
 | M07 | scale chosen only above its factor | `_format.py` | equivalent | |
 | M08 | no upper bound on precision | `_format.py` | killed | `tests/test_format.py::test_integer_options_refuse_bool_and_bounds` |
-| M09 | bool accepted as a value | `_format.py` | killed | `tests/test_contract.py::test_wrong_types_raise_type_error_not_compact_error` |
-| M10 | no guard for tiny exponents | `_format.py` | killed | `tests/test_hostile.py::test_huge_values_and_precision_format_quickly` |
+| M09 | bool accepted as a value | `_value.py` | killed | `tests/test_contract.py::test_wrong_types_raise_type_error_not_compact_error` |
+| M10 | no guard for tiny exponents | `_value.py` | killed | `tests/test_hostile.py::test_huge_values_and_precision_format_quickly` |
 | M11 | bare decimal point left | `_format.py` | killed | `src/compactnum/_format.py::compactnum._format.format` |
-| M12 | lower integer bound off by one | `_format.py` | equivalent | |
+| M12 | lower integer bound off by one | `_value.py` | equivalent | |
 | M13 | separator ignored on output | `_format.py` | killed | `tests/test_cli.py::test_prints_the_result_and_exits_zero` |
 | M14 | octillion letter swapped | `_scales.py` | killed | `tests/test_cli.py::test_prints_the_result_and_exits_zero` |
 | M15 | giga written lower case | `_scales.py` | killed | `tests/test_cli.py::test_prints_the_result_and_exits_zero` |
@@ -145,18 +157,18 @@ neighbours and the 4300-digit limits are byte-identical with and without each mu
 | M17 | IEC prefixes parsed as decimal | `_scales.py` | killed | `src/compactnum/_parse.py::compactnum._parse.parse_decimal` |
 | M18 | sign accepted as separator | `_scales.py` | killed | `tests/test_format.py::test_rejects_unsafe_decimal_separators` |
 | M19 | bool accepted as an integer option | `_scales.py` | killed | `tests/test_format.py::test_integer_options_refuse_bool_and_bounds` |
-| M20 | short alias mapped to metric | `_scales.py` | killed | `tests/test_format.py::test_short_style_is_an_alias_of_si` |
+| M20 | `si` alias mapped to metric | `_scales.py` | killed | `tests/test_format.py::test_short_is_the_default_style_and_si_its_older_name` |
 | M21 | digit accepted as separator | `_scales.py` | killed | `tests/test_format.py::test_rejects_unsafe_decimal_separators` |
 | M22 | non-ASCII digits accepted | `_parse.py` | killed | `tests/test_parse.py::test_explicit_plus_sign_and_ascii_digits_only` |
 | M23 | plus sign refused | `_parse.py` | killed | `tests/test_oracle.py::test_parse_decimal_is_exact_and_normalized` |
-| M24 | digit limit off by one | `_parse.py` | killed | `tests/test_cli.py::test_prints_the_result_and_exits_zero` |
+| M24 | digit limit off by one | `_parse.py` | killed | `tests/test_limits.py::test_parser_digit_limit_is_exactly_8600` |
 | M25 | space before the unit refused | `_parse.py` | killed | `tests/test_oracle.py::test_units_and_separators_round_trip` |
 | M26 | point accepted with another separator | `_parse.py` | killed | `tests/test_parse.py::test_custom_decimal_separator` |
 | M27 | whole values keep their exponent | `_parse.py` | killed | `src/compactnum/__init__.py::compactnum` |
 | M28 | signed zero returned | `_parse.py` | killed | `tests/test_contract.py::test_parse_promise_in_one_place` |
 | M29 | infinite float returned | `_parse.py` | killed | `tests/test_parse.py::test_parse_refuses_a_fraction_too_large_for_a_float` |
 | M30 | suffixes case-sensitive | `_parse.py` | killed | `src/compactnum/_parse.py::compactnum._parse.parse` |
-| M31 | unit case-sensitive | `_parse.py` | killed | `tests/test_contract.py::test_parse_promise_in_one_place` |
+| M31 | unit case-sensitive | `_parse.py` | killed | `src/compactnum/_parse.py::compactnum._parse.parse_decimal` |
 | M32 | longer excerpts | `_errors.py` | killed | `tests/test_hostile.py::test_huge_text_is_handled_quickly_with_short_messages` |
 | M33 | excerpt boundary off by one | `_errors.py` | killed | `tests/test_parse.py::test_messages_quote_at_most_forty_characters` |
 | M34 | data errors exit 2 | `_cli.py` | killed | `tests/test_cli.py::test_rejected_values_exit_one_with_a_short_message` |
@@ -166,9 +178,12 @@ neighbours and the 4300-digit limits are byte-identical with and without each mu
 | M38 | one decimal too many | `_format.py` | killed | `tests/test_cli.py::test_prints_the_result_and_exits_zero` |
 | M39 | unit type unchecked | `_format.py` | killed | `tests/test_format.py::test_text_options_must_be_strings` |
 | M40 | `--no-trim` inverted | `_cli.py` | killed | `tests/test_cli.py::test_prints_the_result_and_exits_zero` |
-| M42 | integers read through float | `_format.py` | killed | `tests/test_format.py::test_value_limits_are_exact` |
+| M42 | integers read through float | `_value.py` | killed | `tests/test_format.py::test_value_limits_are_exact` |
 | M43 | surrounding whitespace refused | `_parse.py` | killed | `tests/test_contract.py::test_parse_promise_in_one_place` |
 | M44 | yobi missing | `_scales.py` | killed | `tests/test_cli.py::test_prints_the_result_and_exits_zero` |
+| M45 | message cut one character late (`> MESSAGE_LIMIT + 1`) | `_cli_io.py` | killed | `tests/test_limits.py::test_cli_messages_are_cut_at_exactly_300_characters` |
+| M46 | `MESSAGE_LIMIT = 301` | `_cli_io.py` | killed | `tests/test_limits.py::test_cli_messages_are_cut_at_exactly_300_characters` |
+| M47 | unit scan stops one character short | `_parse.py` | killed | `tests/test_parse.py::test_text_that_is_only_the_unit_has_no_number` |
 
 ## Packaging, e2e and Pythons (items 8, 10, 13, 14)
 
@@ -484,6 +499,32 @@ Gates: `ruff format --check .`, `ruff check .` and `mypy --strict src tests` exi
 this PC (CPython 3.13.2). On Elena's PC (CPython 3.14.2, NumPy 2.5.4, a clone of 41a9cd2)
 `pytest` exits 0 (315 passed, 10 skipped).
 
+### Independent review round 1 (reviewed at e061874, fixed at 556c6cf)
+
+The independent reviewer (item 16) scored every item PASS except item 18, and so item 16,
+after its own mutation round of 30 mutants at e061874: 27 killed, R04 equivalent (the
+author's M12), R18 and R28 alive. It also found the author table stale: proven at
+b805b23, ten of its mutants no longer matched the code. Findings, all fixed; none is
+disputed:
+
+| Id | Severity | Finding | Fix |
+| --- | --- | --- | --- |
+| F18 | medium | no test pinned the 300-character cut on command-line messages: `> MESSAGE_LIMIT + 1`, `MESSAGE_LIMIT = 301` and even `1000` passed the suite, as did stopping the unit scan one character short in `_without_unit` (`parse("B", unit="B")` then reported the missing unit instead of text that is not compact notation); the item-18 table was proven at b805b23 | `test_cli_messages_are_cut_at_exactly_300_characters`: `bounded` keeps 300 characters whole and cuts 301 to the first 300 plus `...`, and a real usage error of exactly 300 and of 301 characters goes through `main` to stderr the same way; `test_text_that_is_only_the_unit_has_no_number` pins `not compact notation: 'B'` for `parse("B", unit="B")` and for `parse_decimal(" kB ", unit="KB")`; the author table was run again at 556c6cf with the ten stale mutants ported and the survivors added as M45 to M47 (see the item-18 section) |
+| F16 | low | item 16 stays open until a re-review scores every item PASS | re-review pending |
+
+No behaviour changed in this round: the new tests pin what the code already did. GUIDE.md
+now says a message longer than 300 characters is cut to its first 300, followed by
+`...`. Both new tests were run under each survivor in a copy of the tree and fail under
+R28, `MESSAGE_LIMIT = 301`, `1000` and `299`, and R18; their checks also pass on CPython
+3.10.19, 3.11.5, 3.12.12, 3.13.2, 3.14.2 and 3.14.2t on this PC (the argparse message
+differs between versions, so the test measures it first).
+
+Gates: `ruff format --check .`, `ruff check .`, `mypy --strict src` and
+`mypy --strict src tests` exit 0 on this PC (CPython 3.13.2). On Elena's PC (CPython
+3.14.2, NumPy 2.5.4, a clone of 556c6cf with the fetched documents) `pytest` exits 0,
+and so does `pytest` with `COMPACTNUM_E2E=1` (326 passed, 1 skipped: GNU numfmt is not
+on that PC).
+
 ### Disputed findings
 
-None in rounds 1 to 7.
+None in rounds 1 to 7 or in independent review round 1.
