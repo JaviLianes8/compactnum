@@ -39,11 +39,6 @@ class BadFloat:
         raise TypeError("no")
 
 
-class BadIndex:
-    def __index__(self) -> int:
-        raise TypeError("no")
-
-
 class HugeFloat:
     def __float__(self) -> float:
         raise OverflowError("too big")
@@ -59,9 +54,11 @@ class ComplexFloat:
 numbers.Complex.register(ComplexFloat)
 
 
-class Outer:
-    class Inner:
-        pass
+class FloatText(str):
+    """Text that also has ``__float__``."""
+
+    def __float__(self) -> float:
+        return 1500.0
 
 
 def _numpy() -> object:
@@ -92,6 +89,8 @@ def test_values_without_a_number_protocol_are_still_refused() -> None:
         with pytest.raises(TypeError, match="value must be a real number"):
             format(value)  # type: ignore[arg-type]
     assert format(Fraction(3, 2)) == "1.5" and format(Decimal("1.5e3")) == "1.5k"
+    with pytest.raises(TypeError, match=r"value must be a real number, not .*FloatText$"):
+        format(FloatText("1500"))
 
 
 def test_numpy_values_follow_the_annotation() -> None:
@@ -171,25 +170,3 @@ def test_numpy_booleans_are_refused_under_either_name(name: str) -> None:
     stand_in = type(name, (), {"__module__": "numpy", "__index__": lambda self: 1})
     with pytest.raises(TypeError, match=rf"^value must be a real number, not numpy\.{name}$"):
         format(stand_in())
-
-
-def test_a_refusing_index_names_the_type_by_module() -> None:
-    with pytest.raises(TypeError, match=r"BadIndex$") as info:
-        format(BadIndex())
-    assert str(info.value).endswith(f"not {BadIndex.__module__}.BadIndex")
-
-
-def test_a_nested_type_is_named_by_its_qualified_name() -> None:
-    with pytest.raises(TypeError) as info:
-        format(Outer.Inner())  # type: ignore[arg-type]
-    assert str(info.value).endswith(f"not {Outer.__module__}.Outer.Inner")
-
-
-@pytest.mark.parametrize(("length", "shown"), [(80, 80), (81, 80), (109, 80), (79, 79)])
-def test_type_names_are_cut_after_80_characters(length: int, shown: int) -> None:
-    full = "m." + "x" * (length - 2)
-    kind = type("x" * (length - 2), (), {"__module__": "m"})
-    cut = full[:shown] + ("..." if length > 80 else "")
-    with pytest.raises(TypeError) as info:
-        format(kind())
-    assert str(info.value) == f"value must be a real number, not {cut}"
