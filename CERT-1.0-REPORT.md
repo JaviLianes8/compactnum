@@ -17,7 +17,8 @@ Progress:
 - [ ] Independent reviewer (item 16)
 - [ ] Five QA lenses (item 19): round 1 reported 17 findings, all fixed at 1a86ea1; round 2
   re-verified them and reported 9 new ones, all fixed at 7da7243; round 3 re-verified those
-  and reported 9 new ones, all fixed at 0a74dcf; re-verification pending
+  and reported 9 new ones, all fixed at 0a74dcf; round 4 re-verified those and reported 6
+  new ones (one found by two lenses), all fixed at ca77018; re-verification pending
 - [ ] PR #3 from `release/1.0.0` opened and trace guard CLEAN; merge and publish pending (item 17)
 
 ## Scorecard (items 1 to 15 and 18)
@@ -346,6 +347,50 @@ Gates at 0a74dcf: `ruff format --check .`, `ruff check .`, `mypy --strict src` a
 and so does `pytest` with `COMPACTNUM_E2E=1` (301 passed, 8 skipped: the fetched documents
 and GNU numfmt are not on that PC).
 
+### Round 4 (reviewed at b76bff8, fixed at ca77018)
+
+Lenses a, d and e re-ran every round-3 finding: all fixed (lens e replayed each as a
+mutant, 12 of 12 killed). Lens a ran 40 probes (30 in Python, 10 CLI arguments on 3.11.5
+and 3.13.2), lens d the sdist suite against the wheel on six interpreters (297 passed, 7
+upstream skips each) and 35 probes, lens e 24 new mutants, of which 7 survived. New
+findings, all fixed; none is disputed:
+
+| Lens | Id | Severity | Finding | Fix |
+| --- | --- | --- | --- | --- |
+| a, d | N5, F4 | low | on CPython 3.10 and 3.11, `--unit=--` (and `--precision=--`, `--base=--`, `--style=--`, `--decimal-sep=--`) crashed with a `TypeError` traceback, exit 1: argparse before 3.12 drops `--` from an option's values and handed the option an empty list that skipped its checks | the parser reads an option value of exactly `--` as that text and runs the option's own type and choices check on it, as 3.12 and later do: `format 1500 --unit=--` prints `1.5k--`, the others exit 2 naming the option; GUIDE and CHANGELOG |
+| e | E20 (N12, N13) | medium | no test of NumPy void values, so a denylist of data type kinds or an allowed `V` kind survived | `np.void(b"12")` and `np.array(np.void(b"12"))` must be refused, naming `numpy.void` and `numpy.ndarray` |
+| e | E21 (N02, N03) | low | the `bytes` and `bytearray` entries of the refused types were never exercised | `tests/test_value_edges.py`: `bytes` and `bytearray` subclasses with `__float__` must be refused |
+| e | E22 (N05) | low | nothing pinned that only NumPy's own boolean types are refused by name | stand-ins named `bool` and `bool_` from module `mylib` with `__index__` must format as `1.2k` |
+| e | E23 (N23) | low | a `ValueError` from the value's own `__float__` could be turned into `value is too large for a float` | GUIDE states that such a `ValueError` (from `__float__` or `__index__`) reaches the caller unchanged; a test pins both |
+| e | E24 (N24) | low | nothing pinned the `--help` sentence about `--unit=-B` | `test_version_and_help` asserts the whole sentence |
+
+Contract tests first: against b76bff8 the eight cases of
+`tests/test_cli.py::test_an_option_value_of_two_dashes_is_read_as_text_on_every_python`
+failed on CPython 3.11.5 and 3.10.19 and passed on 3.13.2 (N5 and F4); the lens e tests
+passed there, as they pin existing behaviour. At ca77018 that test, `tests/test_cli.py`,
+`tests/test_cli_options.py` and `tests/test_value_edges.py` pass on 3.10.19, 3.11.5,
+3.12.12 and 3.13.2 on this PC. Each surviving lens e mutant and two for the new fix were
+applied alone to a clone of ca77018 on Elena's PC (CPython 3.14.2, NumPy 2.5.4, full
+suite with `-x`), and again to the four changed test files on 3.11.5 and 3.13.2 here:
+
+| Id | Mutation | Caught by |
+| --- | --- | --- |
+| N12 | data type kinds as a denylist (`b c U S m O`) | `tests/test_value_types.py::test_numpy_values_that_hold_no_real_number_are_refused` |
+| N13 | `V` added to the allowed kinds | `tests/test_value_types.py::test_numpy_values_that_hold_no_real_number_are_refused` |
+| N02 | `bytes` not refused | `tests/test_value_edges.py::test_bytes_subclasses_with_float_are_refused[bytes]` |
+| N03 | `bytearray` not refused | `tests/test_value_edges.py::test_bytes_subclasses_with_float_are_refused[bytearray]` |
+| N05 | boolean names refused from any module | `tests/test_value_edges.py::test_only_numpy_booleans_are_refused_by_name[bool]` |
+| N23 | `ValueError` from `__float__` read as an overflow | `tests/test_value_edges.py::test_a_value_error_from_the_values_own_protocol_reaches_the_caller_unchanged[float]` |
+| N24 | `--help` sentence about `--unit=-B` removed | `tests/test_cli.py::test_version_and_help` |
+| F4 | the `--` rule never applies | `tests/test_cli.py::test_an_option_value_of_two_dashes_is_read_as_text_on_every_python` on 3.11.5; equivalent on 3.12 and later, where argparse already passes `--` |
+| F4b | the option's check skipped for `--` | `tests/test_cli.py::test_an_option_value_of_two_dashes_is_read_as_text_on_every_python` |
+
+Gates at ca77018: `ruff format --check .`, `ruff check .`, `mypy --strict src` and
+`mypy --strict src tests` exit 0 on this PC (CPython 3.13.2, NumPy 2.3.5). On Elena's PC
+(CPython 3.14.2, NumPy 2.5.4, a clone of the branch) `pytest` exits 0 (323 collected),
+and so does `pytest` with `COMPACTNUM_E2E=1` (8 skipped: the fetched documents and GNU
+numfmt are not on that PC).
+
 ### Disputed findings
 
-None in rounds 1 to 3.
+None in rounds 1 to 4.
