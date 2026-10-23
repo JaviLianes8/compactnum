@@ -33,7 +33,7 @@ assert "site-packages" in compactnum.__file__, compactnum.__file__
 assert compactnum.__version__ == importlib.metadata.version("compactnum") == "1.0.0"
 assert sorted(compactnum.__all__) == sorted(n for n in dir(compactnum) if not n.startswith("_"))
 assert importlib.resources.files("compactnum").joinpath("py.typed").is_file()
-assert importlib.metadata.requires("compactnum") in (None, [])
+assert all("extra ==" in r for r in importlib.metadata.requires("compactnum") or [])
 assert format(1200) == "1.2k" and format(999_999) == "1M" and format(-1250) == "-1.3k"
 assert format(1536, base=1024, unit="B") == "1.5KiB"
 assert format(10**30, style="metric") == "1Q" and format(10**27, style="long") == "1 octillion"
@@ -80,7 +80,9 @@ def test_wheel_and_sdist_contents(dist: Path) -> None:
     metadata = next(name for name in names if name.endswith(".dist-info/METADATA"))
     text = zipfile.ZipFile(wheel).read(metadata).decode("utf-8")
     assert "Classifier: Development Status :: 5 - Production/Stable" in text
-    assert "Requires-Python: >=3.10" in text and "Requires-Dist" not in text
+    assert "Requires-Python: >=3.10" in text
+    requires = [line for line in text.splitlines() if line.startswith("Requires-Dist:")]
+    assert requires and all(line.endswith("extra == 'dev'") for line in requires)
     with tarfile.open(sdist) as archive:
         listing = [name.split("/", 1)[1] for name in archive.getnames() if "/" in name]
     for present in ("LICENSE", "README.md", "CHANGELOG.md", "GUIDE.md", "src/compactnum/py.typed"):
@@ -88,7 +90,12 @@ def test_wheel_and_sdist_contents(dist: Path) -> None:
     assert "tests/upstream/MANIFEST.json" in listing
     assert "tests/fixtures/icu-compact-en.json" in listing
     for name in listing:
-        assert not name.startswith(("tests/upstream/", ".")) or name.endswith("MANIFEST.json")
+        assert not name.startswith("tests/upstream/") or name.endswith("MANIFEST.json")
+        assert not name.startswith(".") or name in (
+            ".gitignore",
+            ".gitattributes",
+            ".github/FUNDING.yml",
+        )
         assert "IMPROVEMENTS-round" not in name and "CERT-1.0" not in name
         assert "__pycache__" not in name and not name.endswith(".pyc")
 
