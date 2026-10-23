@@ -142,6 +142,10 @@ def _coerce(value: object) -> Decimal:
         raise ValueError("value must be finite")
     if number and number.adjusted() >= MAX_DIGITS:
         raise ValueError(f"value has more than {MAX_DIGITS} integer digits")
+    if number.adjusted() < -2 * MAX_DIGITS:
+        # Rounds to zero at every precision; an exponent this small could also be
+        # outside the range decimal arithmetic accepts.
+        return Decimal(0)
     return number
 
 

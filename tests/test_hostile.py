@@ -110,6 +110,9 @@ def test_huge_values_and_precision_format_quickly() -> None:
     assert _timed(lambda: format(Decimal("1e-999999"), precision=4300)) < 2.0
     assert _timed(lambda: format(Decimal("7." + "3" * 200_000), precision=3)) < 2.0
     assert format(Decimal("1e-999999")) == "0"
+    assert format(Decimal("-5E-1999999999999999997"), precision=4300) == "0"
+    assert format(Decimal("1e-8601"), precision=4300) == "0"
+    assert format(Decimal("6e-4301"), precision=4300, trim_zeros=False) == "0." + "0" * 4299 + "1"
 
 
 def test_results_ignore_the_callers_decimal_context_and_digit_limit() -> None:
